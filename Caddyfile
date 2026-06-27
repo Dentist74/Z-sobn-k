@@ -1,0 +1,8 @@
+# Caddy = reverzní proxy + automatické HTTPS (Let's Encrypt zdarma).
+# Nahraď doménu a spusť: caddy run  (nebo jako služba: caddy start)
+# Předpoklad: doména směřuje (A záznam) na IP tvého serveru a porty 80/443 jsou otevřené.
+
+sklad.tvojedomena.cz {
+    reverse_proxy 127.0.0.1:3000
+    encode gzip
+}

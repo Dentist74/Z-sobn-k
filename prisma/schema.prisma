@@ -1,0 +1,354 @@
+// Skladová aplikace pro zubní kliniku — datový model
+// Pozn.: SQLite nepodporuje nativní enumy → ukládáme jako String,
+// povolené hodnoty hlídá aplikace (viz src/lib/enums.ts).
+// Při migraci na PostgreSQL lze tyto Stringy povýšit na nativní enum.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           String          @id @default(cuid())
+  name         String
+  email        String          @unique
+  passwordHash String
+  pinHash      String? // 4místný PIN (hash) pro rychlé přihlášení u sdíleného tabletu
+  role         String          @default("STAFF") // ADMIN | MANAGER | STAFF
+  active       Boolean         @default(true)
+  movements    StockMovement[]
+  documents    StockDocument[]
+  orders       PurchaseOrder[]
+  sessions     Session[]
+  inventories  InventorySession[]
+  invites      Invitation[]    @relation("InvitesCreated")
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+// Pozvánka nového uživatele (odkaz/e-mail) s předdefinovanou rolí.
+model Invitation {
+  id          String    @id @default(cuid())
+  token       String    @unique
+  email       String? // volitelně — když se posílá e-mailem
+  role        String // MANAGER | STAFF
+  createdById String
+  createdBy   User      @relation("InvitesCreated", fields: [createdById], references: [id])
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([token])
+}
+
+// Uložená inventura (kvůli dohledatelnosti — protokol kdykoliv zpětně).
+model InventorySession {
+  id            String   @id @default(cuid())
+  createdAt     DateTime @default(now())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  adjustedCount Int      @default(0) // počet šarží s rozdílem
+  itemCount     Int      @default(0) // počet napočítaných šarží
+  note          String?
+  reportJson    String // JSON: [{productName, lotNumber, systemQty, countedQty, diff}]
+
+  @@index([createdAt])
+}
+
+// Systémová nastavení (jednořádkový singleton).
+model SystemSetting {
+  id                String   @id @default("singleton")
+  autoLogoutMinutes Int      @default(0) // 0 = nikdy
+  updatedAt         DateTime @updatedAt
+}
+
+// Session pro vlastní cookie-based auth
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Warehouse {
+  id            String                  @id @default(cuid())
+  name          String
+  type          String                  @default("CONSUMABLE") // CONSUMABLE | CONSUMPTION | SMALL_EQUIPMENT | LARGE_EQUIPMENT | OTHER
+  locationLabel String?
+  active        Boolean                 @default(true)
+  bins          StorageBin[]
+  batches       StockBatch[]
+  products      Product[]               @relation("DefaultWarehouse")
+  levels        ProductWarehouseLevel[]
+  documents     StockDocument[]
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+}
+
+model StorageBin {
+  id          String       @id @default(cuid())
+  warehouseId String
+  warehouse   Warehouse    @relation(fields: [warehouseId], references: [id])
+  code        String // "A-03-2" (regál-police-pozice)
+  description String?
+  batches     StockBatch[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([warehouseId])
+}
+
+// Řízený číselník kategorií (product.category drží název kvůli zpětné kompatibilitě).
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+}
+
+// Evidence přístrojů / zařízení (servis, revize).
+model Equipment {
+  id              String    @id @default(cuid())
+  name            String
+  serialNumber    String?
+  category        String?
+  location        String? // umístění / ordinace
+  purchaseDate    DateTime?
+  lastServiceDate DateTime?
+  nextServiceDate DateTime? // příští revize
+  note            String?
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// Ordinace / oddělení, kterému se připisuje spotřeba (výdej).
+model Ordinace {
+  id        String          @id @default(cuid())
+  name      String
+  note      String?
+  active    Boolean         @default(true)
+  movements StockMovement[]
+  documents StockDocument[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+}
+
+model Supplier {
+  id         String            @id @default(cuid())
+  name       String
+  ico        String?
+  dic        String?
+  orderEmail String?
+  orderUrl   String?
+  note       String?
+  active     Boolean           @default(true)
+  contacts   SupplierContact[]
+  products   Product[]         @relation("DefaultSupplier")
+  batches     StockBatch[]
+  documents   StockDocument[]
+  orders      PurchaseOrder[]
+  productRefs SupplierProductRef[]
+  createdAt   DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+}
+
+// Naučené párování: jak konkrétní dodavatel pojmenovává/kóduje naši kartu.
+// Umožní příště automaticky napárovat i jiný popis stejného produktu.
+model SupplierProductRef {
+  id         String    @id @default(cuid())
+  productId  String
+  product    Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
+  code       String? // kód dodavatele z dokladu
+  name       String? // název dodavatele z dokladu (normalizovaný se hledá)
+  createdAt  DateTime  @default(now())
+
+  @@index([productId])
+  @@index([code])
+}
+
+// Objednávka u dodavatele. Nikdy se neodesílá automaticky (viz business pravidlo).
+model PurchaseOrder {
+  id         String              @id @default(cuid())
+  supplierId String
+  supplier   Supplier            @relation(fields: [supplierId], references: [id])
+  status     String              @default("DRAFT") // DRAFT | SENT | CONFIRMED | RECEIVED | CANCELLED
+  createdById String
+  createdBy  User                @relation(fields: [createdById], references: [id])
+  note       String?
+  sentAt     DateTime?
+  items      PurchaseOrderItem[]
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@index([status, createdAt])
+  @@index([supplierId])
+}
+
+model PurchaseOrderItem {
+  id        String        @id @default(cuid())
+  orderId   String
+  order     PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product       @relation(fields: [productId], references: [id])
+  quantity  Float
+  unitPrice Decimal? // bez DPH
+  createdAt DateTime      @default(now())
+
+  @@index([orderId])
+}
+
+model SupplierContact {
+  id         String   @id @default(cuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  name       String
+  email      String?
+  phone      String?
+  isPrimary  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([supplierId])
+}
+
+model Product {
+  id                 String       @id @default(cuid())
+  name               String
+  sku                String       @unique // M-kód (interní kód)
+  distributorCode    String? // DL-kód (kód distributora)
+  manufacturerCode   String? // REF / kód výrobce
+  category           String?
+  unit               String       @default("PCS") // základní (skladová) jednotka: PCS | ML | G | OTHER
+  piecesPerPackage   Float        @default(1) // kolik základních jednotek (ks) je v balení
+  packageLabel       String? // název balení (např. "balení", "krabice")
+  description        String?
+  defaultWarehouseId String?
+  defaultWarehouse   Warehouse?   @relation("DefaultWarehouse", fields: [defaultWarehouseId], references: [id])
+  defaultSupplierId  String?
+  defaultSupplier    Supplier?    @relation("DefaultSupplier", fields: [defaultSupplierId], references: [id])
+  minQuantity        Float        @default(0) // globální výchozí min. hladina
+  optimalQuantity    Float        @default(0) // globální výchozí optimální hladina
+  reorderQuantity    Float        @default(0)
+  pricePurchase      Decimal      @default(0) // nákupní cena BEZ DPH
+  vatRate            Float        @default(21) // sazba DPH v %
+  isMedicalDevice    Boolean      @default(false)
+  trackBatches       Boolean      @default(true)
+  trackLevels        Boolean      @default(true) // false = hladiny min/opt se nesledují
+  needsReview        Boolean      @default(false) // karta založená ze skenu — čeká na doplnění
+  storageLocation    String? // umístění ve skladu (pozice pro snazší hledání)
+  active             Boolean      @default(true)
+  batches            StockBatch[]
+  barcodes           ProductBarcode[]
+  levels             ProductWarehouseLevel[]
+  orderItems         PurchaseOrderItem[]
+  supplierRefs       SupplierProductRef[]
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+}
+
+// Více čárových kódů (EAN) na jeden produkt — pro skenování různých balení.
+model ProductBarcode {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  code      String
+
+  @@index([code])
+  @@index([productId])
+}
+
+// Min. a optimální hladina zásoby nastavená per sklad (přepisuje globální default produktu).
+model ProductWarehouseLevel {
+  id              String    @id @default(cuid())
+  productId       String
+  product         Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouseId     String
+  warehouse       Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  minQuantity     Float     @default(0)
+  optimalQuantity Float     @default(0)
+
+  @@unique([productId, warehouseId])
+  @@index([warehouseId])
+}
+
+// Reálné množství na skladě žije TADY (ne na Productu).
+model StockBatch {
+  id            String          @id @default(cuid())
+  productId     String
+  product       Product         @relation(fields: [productId], references: [id])
+  warehouseId   String
+  warehouse     Warehouse       @relation(fields: [warehouseId], references: [id])
+  binId         String?
+  bin           StorageBin?     @relation(fields: [binId], references: [id])
+  supplierId    String?
+  supplier      Supplier?       @relation(fields: [supplierId], references: [id])
+  lotNumber     String? // č. šarže od výrobce
+  expiryDate    DateTime?
+  quantity      Float           @default(0)
+  pricePurchase Decimal? // cena konkrétní dodávky (bez DPH)
+  positionRow   String? // Řada
+  positionShelf String? // Regál
+  positionRack  String? // Police
+  receivedAt    DateTime        @default(now())
+  movements     StockMovement[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([productId, expiryDate]) // FEFO řazení
+  @@index([warehouseId])
+}
+
+// Doklad seskupující více pohybů (příjemka / výdejka).
+model StockDocument {
+  id             String          @id @default(cuid())
+  type           String // RECEIPT | ISSUE | TRANSFER
+  warehouseId    String?
+  warehouse      Warehouse?      @relation(fields: [warehouseId], references: [id])
+  supplierId     String? // u příjmu
+  supplier       Supplier?       @relation(fields: [supplierId], references: [id])
+  ordinaceId     String? // u výdeje
+  ordinace       Ordinace?       @relation(fields: [ordinaceId], references: [id])
+  userId         String
+  user           User            @relation(fields: [userId], references: [id])
+  note           String?
+  reference      String?
+  additionalCost Decimal? // vedlejší náklady (doprava apod.), bez DPH
+  attachmentPath String? // uložená fotka/sken dokladu (faktura)
+  attachmentName String? // původní název souboru
+  movements      StockMovement[]
+  createdAt      DateTime        @default(now())
+
+  @@index([type, createdAt])
+}
+
+// Audit trail — záznamy se NIKDY nemažou, jen přidávají.
+model StockMovement {
+  id         String         @id @default(cuid())
+  batchId    String
+  batch      StockBatch     @relation(fields: [batchId], references: [id])
+  documentId String?
+  document   StockDocument? @relation(fields: [documentId], references: [id])
+  type       String // RECEIPT | ISSUE | WRITE_OFF | ADJUSTMENT | TRANSFER
+  quantity   Float // + příjem / − výdej
+  userId     String
+  user       User           @relation(fields: [userId], references: [id])
+  ordinaceId String? // u výdeje — která ordinace spotřebovala
+  ordinace   Ordinace?      @relation(fields: [ordinaceId], references: [id])
+  reason     String?
+  reference  String?
+  createdAt  DateTime       @default(now())
+
+  @@index([batchId])
+  @@index([type, createdAt])
+  @@index([ordinaceId])
+  @@index([documentId])
+}

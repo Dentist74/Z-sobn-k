@@ -1,0 +1,12 @@
+{
+  "name": "Svět úsměvů – Zásobník",
+  "short_name": "Zásobník",
+  "description": "Zásobník – skladový systém zubní kliniky Svět úsměvů",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#103D63",
+  "theme_color": "#103D63",
+  "icons": [
+    { "src": "/brand-logo.png", "sizes": "286x69", "type": "image/png", "purpose": "any" }
+  ]
+}
