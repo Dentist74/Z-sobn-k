@@ -7,6 +7,9 @@ export const metadata = {
   title: "Přihlášení – Zásobník",
 };
 
+// Stránka čte stav DB (isSetupOpen) za běhu — nesmí se prerenderovat při buildu.
+export const dynamic = "force-dynamic";
+
 export default async function LoginPage() {
   const setupOpen = await isSetupOpen();
   return (
