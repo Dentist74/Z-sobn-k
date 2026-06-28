@@ -22,6 +22,7 @@
     "@base-ui/react": "^1.6.0",
     "@prisma/adapter-better-sqlite3": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@zxing/browser": "^0.2.0",
     "@zxing/library": "^0.22.0",
     "bcryptjs": "^3.0.3",
