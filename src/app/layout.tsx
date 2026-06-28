@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   description: "Zásobník – skladový systém zubní kliniky Svět úsměvů",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Zásobník", statusBarStyle: "default" },
-  icons: { icon: "/brand-logo.png", apple: "/brand-logo.png" },
+  icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Check, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { CameraScanButton } from "@/components/camera-scan-button";
 import { UNIT_LABELS, type Unit } from "@/lib/enums";
 
 export type PickerProduct = {
@@ -57,6 +58,18 @@ export function ProductPicker({
     if (filtered.length === 1) return select(filtered[0]);
   }
 
+  // Sken fotoaparátem: přesná shoda → vyber, jinak nech vyhledat ručně.
+  function onCameraScan(code: string) {
+    const needle = code.trim().toLowerCase();
+    const exact = products.find(
+      (p) =>
+        p.sku.toLowerCase() === needle ||
+        p.codes.some((c) => c.toLowerCase() === needle),
+    );
+    if (exact) select(exact);
+    else setQ(code);
+  }
+
   if (value) {
     return (
       <div className="flex items-center justify-between rounded-md border bg-slate-50 px-3 py-2">
@@ -84,18 +97,19 @@ export function ProductPicker({
   }
 
   return (
-    <div className="relative">
-      <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-      <Input
-        autoFocus
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        onKeyDown={onKeyDown}
-        placeholder="Hledat položku nebo naskenovat čárový kód…"
-        className="pl-9"
-      />
-      {filtered.length > 0 && (
-        <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-md border bg-white shadow-md">
+    <div className="flex gap-2">
+      <div className="relative flex-1">
+        <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+        <Input
+          autoFocus
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="Hledat položku nebo naskenovat čárový kód…"
+          className="pl-9"
+        />
+        {filtered.length > 0 && (
+          <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-md border bg-white shadow-md">
           {filtered.map((p) => (
             <li key={p.id}>
               <button
@@ -110,9 +124,11 @@ export function ProductPicker({
                 </span>
               </button>
             </li>
-          ))}
-        </ul>
-      )}
+            ))}
+          </ul>
+        )}
+      </div>
+      <CameraScanButton onScan={onCameraScan} />
     </div>
   );
 }

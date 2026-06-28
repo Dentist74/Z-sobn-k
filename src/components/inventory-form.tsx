@@ -6,6 +6,7 @@ import { ClipboardList, ScanBarcode, RotateCcw, Search, Printer } from "lucide-r
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useDirty } from "@/components/nav-guard";
+import { CameraScanButton } from "@/components/camera-scan-button";
 import {
   Table,
   TableBody,
@@ -65,20 +66,23 @@ export function InventoryForm({
     scanRef.current?.focus();
   }
 
-  function onScan(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key !== "Enter") return;
-    e.preventDefault();
-    const code = scan.trim().toLowerCase();
+  function applyScan(raw: string) {
+    const code = raw.trim().toLowerCase();
     if (!code) return;
     const hit = batches.find((b) => b.codes.some((c) => c.toLowerCase() === code));
     if (!hit) {
-      setScanInfo({ ok: false, text: `Kód „${scan}" není na skladě.` });
+      setScanInfo({ ok: false, text: `Kód „${raw}" není na skladě.` });
       setScan("");
       return;
     }
     setCounts((c) => ({ ...c, [hit.id]: String((Number(c[hit.id]) || 0) + 1) }));
     setScanInfo({ ok: true, text: `${hit.productName}: +1 → ${(Number(counts[hit.id]) || 0) + 1}` });
     setScan("");
+  }
+  function onScan(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    applyScan(scan);
   }
 
   function submit() {
@@ -198,6 +202,7 @@ export function InventoryForm({
                 placeholder="Naskenuj čárový kód…" className="pl-9" />
             </div>
           </div>
+          <CameraScanButton onScan={applyScan} />
           <Button variant="outline" onClick={resetToZero} type="button">
             <RotateCcw className="size-4" /> Vynulovat napočítané
           </Button>

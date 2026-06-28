@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/dal";
 import { parseEvidentistFile, type ImportRecord } from "@/lib/import-evidentist";
+import { parseLevelsFile, type LevelRecord } from "@/lib/import-levels";
 
 export type ImportParseResult = {
   ok: boolean;
@@ -171,4 +172,45 @@ export async function runImport(
   revalidatePath("/produkty");
   revalidatePath("/dashboard");
   return { ok: true, created, updated, stockSet, skippedStock };
+}
+
+// ---------- Import hladin min/opt (podle M-kódu) ----------
+
+export type LevelsParseResult = {
+  ok: boolean;
+  error?: string;
+  records?: LevelRecord[];
+};
+
+export async function parseLevels(base64: string): Promise<LevelsParseResult> {
+  await requireRole("MANAGER");
+  try {
+    const records = await parseLevelsFile(Buffer.from(base64, "base64"));
+    if (records.length === 0) {
+      return { ok: false, error: "V souboru nejsou řádky s M-kódem (zkontroluj sloupce M-kód / Minimum / Optimum)." };
+    }
+    return { ok: true, records };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Soubor se nepodařilo načíst." };
+  }
+}
+
+export async function runLevelsImport(
+  records: LevelRecord[],
+): Promise<{ ok: boolean; updated?: number; notFound?: number; error?: string }> {
+  await requireRole("MANAGER");
+  if (!Array.isArray(records) || records.length === 0) return { ok: false, error: "Není co importovat." };
+  let updated = 0;
+  let notFound = 0;
+  for (const r of records) {
+    const res = await db.product.updateMany({
+      where: { sku: r.sku },
+      data: { minQuantity: Math.max(0, r.min), optimalQuantity: Math.max(0, r.opt), trackLevels: true },
+    });
+    if (res.count > 0) updated++;
+    else notFound++;
+  }
+  revalidatePath("/produkty");
+  revalidatePath("/dashboard");
+  return { ok: true, updated, notFound };
 }

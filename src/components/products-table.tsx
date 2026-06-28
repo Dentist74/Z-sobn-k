@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toggleProductActive, deleteProduct, bulkUpdateProducts } from "@/app/actions/products";
+import { CameraScanButton } from "@/components/camera-scan-button";
 
 export type ProductRowVM = {
   id: string;
@@ -173,6 +174,7 @@ export function ProductsTable({
           <Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKeyDown}
             placeholder="Hledat název, kód nebo naskenovat čárový kód…" className="pl-9" />
         </div>
+        <CameraScanButton onScan={(code) => setQ(code)} />
         {warehouses.length > 1 && (
           <select value={wh} onChange={(e) => setWh(e.target.value)} className={selectClass}>
             <option value="">Všechny sklady</option>

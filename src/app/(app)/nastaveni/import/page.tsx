@@ -1,6 +1,7 @@
 import { requireRole } from "@/lib/dal";
 import { db } from "@/lib/db";
 import { ImportProducts } from "@/components/import-products";
+import { LevelsImport } from "@/components/levels-import";
 
 export const metadata = { title: "Import produktů – Zásobník" };
 
@@ -22,6 +23,7 @@ export default async function ImportPage() {
         </p>
       </div>
       <ImportProducts warehouses={warehouses} />
+      <LevelsImport />
     </div>
   );
 }
