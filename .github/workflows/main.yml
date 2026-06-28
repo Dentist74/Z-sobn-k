@@ -1,0 +1,16 @@
+name: Zaloha databaze
+on:
+  schedule:
+    - cron: "0 1 * * *"   # každý den ~02:00 (CZ)
+  workflow_dispatch:        # + možnost spustit ručně
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stáhnout zálohu
+        run: curl -fsSL "https://zasobnik.up.railway.app/api/export/db?token=${{ secrets.BACKUP_TOKEN }}" -o zasobnik-backup.db
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zasobnik-db
+          path: zasobnik-backup.db
+          retention-days: 90
