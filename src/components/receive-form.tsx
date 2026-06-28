@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
 import { useDirty } from "@/components/nav-guard";
+import { compressImage } from "@/lib/image";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -66,13 +67,17 @@ export function ReceiveForm({
   >(null);
   const [pending, startTransition] = useTransition();
 
-  function onInvoiceFile(file: File) {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = String(reader.result);
-      setAttachment({ base64: dataUrl.split(",")[1] ?? "", name: file.name, mediaType: file.type });
-    };
-    reader.readAsDataURL(file);
+  async function onInvoiceFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Přilož fotku (JPG/PNG).");
+      return;
+    }
+    try {
+      const { base64 } = await compressImage(file);
+      setAttachment({ base64, name: file.name.replace(/\.[^.]+$/, "") + ".jpg", mediaType: "image/jpeg" });
+    } catch {
+      toast.error("Obrázek se nepodařilo zpracovat.");
+    }
   }
 
   // rozpracovaná položka

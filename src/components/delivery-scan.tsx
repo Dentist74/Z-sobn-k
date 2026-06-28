@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ProductPicker, type PickerProduct } from "@/components/product-picker";
+import { compressImage } from "@/lib/image";
 import {
   scanDeliveryNote,
   matchScanLine,
@@ -69,18 +70,18 @@ export function DeliveryScan({
   }
 
   // 1) vyber/vyfoť → ukáže náhled (nic se ještě neposílá do AI)
-  function handleFile(file: File) {
-    if (!ALLOWED.includes(file.type as (typeof ALLOWED)[number])) {
-      toast.error("Nahraj fotku (JPG/PNG/WEBP). PDF zatím vyfoť jako obrázek.");
+  async function handleFile(file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Nahraj fotku (JPG/PNG). PDF zatím vyfoť jako obrázek.");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = String(reader.result);
-      const base64 = dataUrl.split(",")[1] ?? "";
-      setPreview({ dataUrl, base64, mediaType: file.type as (typeof ALLOWED)[number] });
-    };
-    reader.readAsDataURL(file);
+    try {
+      // zmenšení v telefonu → menší přenos, rychlejší a levnější AI
+      const { dataUrl, base64 } = await compressImage(file);
+      setPreview({ dataUrl, base64, mediaType: "image/jpeg" });
+    } catch {
+      toast.error("Obrázek se nepodařilo zpracovat. Zkus to znovu.");
+    }
   }
 
   // 2) potvrzení náhledu → teprve teď rozpoznání přes AI
