@@ -304,3 +304,46 @@ export async function deleteProduct(id: string): Promise<ProductActionResult> {
   revalidatePath("/produkty");
   return { ok: true };
 }
+
+// Tvrdé smazání položek VČETNĚ skladové historie (pohyby, šarže, kódy, hladiny, položky objednávek).
+// Určeno pro úklid před ostrým spuštěním / čistou re-migraci z Evidentistu. Nevratné.
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+async function purgeProducts(ids: string[]): Promise<void> {
+  for (const part of chunk(ids, 200)) {
+    await db.$transaction([
+      db.stockMovement.deleteMany({ where: { batch: { productId: { in: part } } } }),
+      db.stockBatch.deleteMany({ where: { productId: { in: part } } }),
+      db.purchaseOrderItem.deleteMany({ where: { productId: { in: part } } }),
+      db.supplierProductRef.deleteMany({ where: { productId: { in: part } } }),
+      db.productWarehouseLevel.deleteMany({ where: { productId: { in: part } } }),
+      db.productBarcode.deleteMany({ where: { productId: { in: part } } }),
+      db.product.deleteMany({ where: { id: { in: part } } }),
+    ]);
+  }
+}
+
+export async function bulkDeleteProducts(
+  ids: string[],
+): Promise<{ ok: boolean; deleted?: number; error?: string }> {
+  await requireRole("MANAGER");
+  const clean = [...new Set(ids.filter(Boolean))];
+  if (clean.length === 0) return { ok: false, error: "Nic nevybráno." };
+  await purgeProducts(clean);
+  revalidatePath("/produkty");
+  revalidatePath("/dashboard");
+  return { ok: true, deleted: clean.length };
+}
+
+export async function deleteAllProducts(): Promise<{ ok: boolean; deleted?: number; error?: string }> {
+  await requireRole("MANAGER");
+  const all = await db.product.findMany({ select: { id: true } });
+  await purgeProducts(all.map((p) => p.id));
+  revalidatePath("/produkty");
+  revalidatePath("/dashboard");
+  return { ok: true, deleted: all.length };
+}

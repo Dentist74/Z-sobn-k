@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { toggleProductActive, deleteProduct, bulkUpdateProducts } from "@/app/actions/products";
+import { toggleProductActive, deleteProduct, bulkUpdateProducts, bulkDeleteProducts, deleteAllProducts } from "@/app/actions/products";
 import { CameraScanButton } from "@/components/camera-scan-button";
 
 export type ProductRowVM = {
@@ -161,6 +161,31 @@ export function ProductsTable({
     });
   }
 
+  function removeSelected() {
+    if (selected.size === 0) return;
+    if (!confirm(`Opravdu SMAZAT ${selected.size} vybraných položek včetně skladové historie (pohyby, šarže)? Nevratné.`)) return;
+    startTransition(async () => {
+      const res = await bulkDeleteProducts([...selected]);
+      if (!res.ok) { toast.error(res.error ?? "Smazání selhalo."); return; }
+      toast.success(`Smazáno ${res.deleted} položek.`);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
+  function removeAll() {
+    const n = rows.length;
+    if (!confirm(`Opravdu SMAZAT ÚPLNĚ VŠECH ${n} položek skladu? Smaže se i veškerá skladová historie (pohyby, šarže, doklady položek). Nevratné!`)) return;
+    if (!confirm(`Poslední potvrzení — opravdu smazat vše (${n} položek)?`)) return;
+    startTransition(async () => {
+      const res = await deleteAllProducts();
+      if (!res.ok) { toast.error(res.error ?? "Smazání selhalo."); return; }
+      toast.success(`Smazáno ${res.deleted} položek.`);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
   const selCol = canManage ? 1 : 0;
   const colCount = 5 + (showPrices ? 1 : 0) + selCol;
   const allShownSelected = filtered.length > 0 && filtered.every((r) => selected.has(r.id));
@@ -198,6 +223,12 @@ export function ProductsTable({
           <option value="inactive">Neaktivní</option>
           <option value="all">Vše</option>
         </select>
+        {canManage && rows.length > 0 && (
+          <Button variant="ghost" size="sm" onClick={removeAll} disabled={pending}
+            className="ml-auto text-red-600 hover:bg-red-50 hover:text-red-700">
+            <Trash2 className="size-4" /> Smazat vše
+          </Button>
+        )}
       </div>
 
       {/* Lišta hromadné úpravy */}
@@ -210,6 +241,10 @@ export function ProductsTable({
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
               <X className="size-4" /> Zrušit výběr
+            </Button>
+            <Button size="sm" variant="ghost" onClick={removeSelected} disabled={pending}
+              className="text-red-600 hover:bg-red-50 hover:text-red-700">
+              <Trash2 className="size-4" /> Smazat vybrané
             </Button>
           </div>
           {bulkOpen && (

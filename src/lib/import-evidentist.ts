@@ -1,11 +1,13 @@
 import "server-only";
 import { Readable } from "node:stream";
 import readXlsxFile from "read-excel-file/node";
+import { parseCsv } from "./csv";
 
 export type ImportRecord = {
   name: string;
   manufacturerCode: string | null;
-  sku: string; // M-kód (interní)
+  distributorCode: string | null; // DL-kód (kód distributora)
+  sku: string; // M-kód (interní) — může být prázdný (položky bez M-kódu)
   barcodes: string[];
   stockQty: number; // Aktuálně skladem (ks)
   priceExclVat: number;
@@ -57,19 +59,27 @@ function colFinder(header: Rows[number]) {
 }
 
 export async function parseEvidentistFile(buffer: Buffer): Promise<ImportRecord[]> {
-  const res = await readXlsxFile(Readable.from(buffer) as never);
-  // read-excel-file může vrátit buď rows[][], nebo [{sheet, data}]
-  const rows: Rows = Array.isArray(res) && res[0] && typeof res[0] === "object" && "data" in (res[0] as object)
-    ? ((res[0] as { data: Rows }).data)
-    : (res as unknown as Rows);
+  // xlsx je ZIP (začíná "PK"); jinak to bereme jako textové CSV.
+  const isXlsx = buffer.length > 1 && buffer[0] === 0x50 && buffer[1] === 0x4b;
+  let rows: Rows;
+  if (isXlsx) {
+    const res = await readXlsxFile(Readable.from(buffer) as never);
+    // read-excel-file může vrátit buď rows[][], nebo [{sheet, data}]
+    rows = Array.isArray(res) && res[0] && typeof res[0] === "object" && "data" in (res[0] as object)
+      ? ((res[0] as { data: Rows }).data)
+      : (res as unknown as Rows);
+  } else {
+    rows = parseCsv(buffer.toString("utf8"));
+  }
 
   if (!rows || rows.length < 2) return [];
 
   const header = rows[0];
   const find = colFinder(header);
-  const iName = find("Název produktu", "název", "name");
+  const iName = find("Název produktu", "název", "nazev", "name");
   const iRef = find("Kód výrobce (REF)", "kód výrobce", "ref");
-  const iSku = find("M-kód", "m-kod", "sku");
+  const iDl = find("DL-kód", "dl-kod", "dl_kod", "kód distributora", "distributor");
+  const iSku = find("M-kód", "m-kod", "m_kod", "sku");
   const iEans = [
     find("EAN"),
     find("EAN2"),
@@ -77,8 +87,8 @@ export async function parseEvidentistFile(buffer: Buffer): Promise<ImportRecord[
     find("EAN4"),
     find("EAN5"),
   ].filter((x) => x >= 0);
-  const iStock = find("Aktuálně skladem (ks)", "skladem");
-  const iPrice = find("Výchozí nákupní cena bez DPH", "cena bez dph");
+  const iStock = find("Aktuálně skladem (ks)", "skladem", "ks skladem");
+  const iPrice = find("Výchozí nákupní cena bez DPH", "cena bez dph", "cena");
   const iVat = find("Sazba DPH (%)", "dph");
   const iSupplier = find("Výchozí dodavatel", "dodavatel");
   const iType = find("Typ skladování", "skladování");
@@ -88,8 +98,8 @@ export async function parseEvidentistFile(buffer: Buffer): Promise<ImportRecord[
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
     const name = s(row[iName]);
-    const sku = s(row[iSku]);
-    if (!name || !sku) continue; // přeskoč prázdné řádky
+    const sku = iSku >= 0 ? s(row[iSku]) : "";
+    if (!name) continue; // řádek musí mít aspoň název (M-kód nemusí)
 
     const barcodes: string[] = [];
     for (const ix of iEans) {
@@ -104,6 +114,7 @@ export async function parseEvidentistFile(buffer: Buffer): Promise<ImportRecord[
     out.push({
       name,
       manufacturerCode: iRef >= 0 ? s(row[iRef]) || null : null,
+      distributorCode: iDl >= 0 ? s(row[iDl]) || null : null,
       sku,
       barcodes,
       stockQty: iStock >= 0 ? Math.max(0, n(row[iStock])) : 0,

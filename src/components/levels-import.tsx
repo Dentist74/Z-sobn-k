@@ -31,8 +31,12 @@ export function LevelsImport() {
     start(async () => {
       const res = await runLevelsImport(records);
       if (!res.ok) { toast.error(res.error ?? "Import selhal."); return; }
+      const extra = [
+        res.notFound ? `nenalezeno ${res.notFound}` : "",
+        res.ambiguous ? `${res.ambiguous} nejednoznačných` : "",
+      ].filter(Boolean).join(", ");
       toast.success(
-        `Hladiny doplněny u ${res.updated} položek${res.notFound ? `, nenalezeno ${res.notFound} M-kódů` : ""}.`,
+        `Hladiny doplněny u ${res.updated} položek${extra ? ` (${extra})` : ""}.`,
       );
       setRecords(null);
       router.push("/produkty");
@@ -43,26 +47,26 @@ export function LevelsImport() {
     <div className="rounded-lg border bg-white p-6">
       <h2 className="font-semibold text-slate-900">Import hladin (min / opt)</h2>
       <p className="mt-1 mb-4 text-sm text-slate-500">
-        Tabulka (.xlsx) se sloupci <strong>M-kód</strong>, <strong>Minimum</strong>,{" "}
-        <strong>Optimum</strong>. Spáruje se podle M-kódu a doplní hladiny u existujících karet.
-        (Evidentist hladiny neexportuje — soubor připravíme zvlášť.)
+        Tabulka (.xlsx nebo .csv) se sloupci <strong>Název</strong> a/nebo <strong>M-kód</strong>,{" "}
+        <strong>Minimum</strong>, <strong>Optimum</strong>. Spáruje se nejdřív podle M-kódu, zbytek
+        podle přesného názvu, a doplní hladiny u existujících karet.
       </p>
 
       {!records ? (
         <label className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed border-slate-200 p-8 text-center hover:border-slate-300">
-          <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          <input type="file" accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
           <Upload className="size-7 text-slate-400" />
           <span className="text-sm font-medium text-slate-700">
-            {pending ? "Načítám…" : "Vyber soubor s hladinami (.xlsx)"}
+            {pending ? "Načítám…" : "Vyber soubor s hladinami (.xlsx / .csv)"}
           </span>
         </label>
       ) : (
         <div className="space-y-3">
           <p className="text-sm">
-            Nalezeno <strong>{records.length}</strong> řádků s M-kódem. Doplní se min/opt
-            u odpovídajících karet.
+            Nalezeno <strong>{records.length}</strong> řádků. Doplní se min/opt
+            u odpovídajících karet (podle M-kódu, pak názvu).
           </p>
           <div className="flex gap-2">
             <Button onClick={run} disabled={pending}>

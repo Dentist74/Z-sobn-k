@@ -36,12 +36,19 @@ export async function parseImport(base64: string): Promise<ImportParseResult> {
     return { ok: false, error: "V souboru nejsou žádné položky (zkontroluj formát exportu)." };
   }
 
-  const skus = records.map((r) => r.sku);
-  const existingRows = await db.product.findMany({
-    where: { sku: { in: skus } },
-    select: { sku: true },
-  });
-  const existing = existingRows.length;
+  // Kolik už existuje: podle M-kódu, u položek bez M-kódu podle názvu.
+  const skus = records.map((r) => r.sku).filter(Boolean);
+  const [skuRows, nameRows] = await Promise.all([
+    db.product.findMany({ where: { sku: { in: skus } }, select: { sku: true } }),
+    db.product.findMany({ select: { name: true } }),
+  ]);
+  const norm = (x: string) => x.trim().toLowerCase().replace(/\s+/g, " ");
+  const skuSet = new Set(skuRows.map((r) => r.sku));
+  const nameSet = new Set(nameRows.map((r) => norm(r.name)));
+  let existing = 0;
+  for (const r of records) {
+    if (r.sku ? skuSet.has(r.sku) : nameSet.has(norm(r.name))) existing++;
+  }
 
   return {
     ok: true,
@@ -86,6 +93,30 @@ export async function runImport(
     (await db.productBarcode.findMany({ select: { code: true } })).map((b) => b.code),
   );
 
+  // mapy pro párování (M-kód / název) + generování unikátního M-kódu u položek bez něj
+  const allProducts = await db.product.findMany({ select: { id: true, sku: true, name: true } });
+  const norm = (x: string) => x.trim().toLowerCase().replace(/\s+/g, " ");
+  const bySku = new Map<string, string>();
+  const nameCount = new Map<string, number>();
+  const nameId = new Map<string, string>();
+  const usedSkus = new Set<string>();
+  for (const p of allProducts) {
+    if (p.sku) { bySku.set(p.sku.trim().toLowerCase(), p.id); usedSkus.add(p.sku); }
+    const k = norm(p.name);
+    nameCount.set(k, (nameCount.get(k) ?? 0) + 1);
+    nameId.set(k, p.id);
+  }
+  const slug = (x: string) =>
+    x.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  function genSku(name: string): string {
+    const base = ("EV-" + slug(name).slice(0, 22)).replace(/-+$/, "") || "EV-polozka";
+    let sku = base;
+    let i = 2;
+    while (usedSkus.has(sku)) { sku = `${base}-${i}`; i++; }
+    usedSkus.add(sku);
+    return sku;
+  }
+
   let created = 0;
   let updated = 0;
   let stockSet = 0;
@@ -94,10 +125,19 @@ export async function runImport(
   for (const rec of records) {
     const supplierId = await resolveSupplier(rec.supplierName);
 
-    const existing = await db.product.findUnique({
-      where: { sku: rec.sku },
-      select: { id: true, _count: { select: { batches: true } } },
-    });
+    // spáruj: podle M-kódu; u položek bez M-kódu podle jednoznačného názvu
+    const skuKey = rec.sku ? rec.sku.trim().toLowerCase() : "";
+    let matchedId = skuKey ? bySku.get(skuKey) : undefined;
+    if (!matchedId && !rec.sku) {
+      const k = norm(rec.name);
+      if (nameCount.get(k) === 1) matchedId = nameId.get(k);
+    }
+    const existing = matchedId
+      ? await db.product.findUnique({
+          where: { id: matchedId },
+          select: { id: true, _count: { select: { batches: true } } },
+        })
+      : null;
 
     let productId: string;
     if (existing) {
@@ -106,6 +146,7 @@ export async function runImport(
         data: {
           name: rec.name,
           manufacturerCode: rec.manufacturerCode,
+          distributorCode: rec.distributorCode,
           defaultSupplierId: supplierId,
           piecesPerPackage: rec.piecesPerPackage,
           packageLabel: rec.packaged ? "balení" : null,
@@ -116,11 +157,13 @@ export async function runImport(
       productId = existing.id;
       updated++;
     } else {
+      const newSku = rec.sku || genSku(rec.name);
       const p = await db.product.create({
         data: {
           name: rec.name,
-          sku: rec.sku,
+          sku: newSku,
           manufacturerCode: rec.manufacturerCode,
+          distributorCode: rec.distributorCode,
           defaultSupplierId: supplierId,
           unit: "PCS",
           piecesPerPackage: rec.piecesPerPackage,
@@ -131,6 +174,11 @@ export async function runImport(
         select: { id: true },
       });
       productId = p.id;
+      // ať se případný další stejný název v téže dávce spáruje na tenhle nový záznam
+      const k = norm(rec.name);
+      nameCount.set(k, (nameCount.get(k) ?? 0) + 1);
+      nameId.set(k, productId);
+      bySku.set(newSku.trim().toLowerCase(), productId);
       created++;
     }
 
@@ -187,7 +235,7 @@ export async function parseLevels(base64: string): Promise<LevelsParseResult> {
   try {
     const records = await parseLevelsFile(Buffer.from(base64, "base64"));
     if (records.length === 0) {
-      return { ok: false, error: "V souboru nejsou řádky s M-kódem (zkontroluj sloupce M-kód / Minimum / Optimum)." };
+      return { ok: false, error: "V souboru nejsou řádky (zkontroluj sloupce Název / M-kód / Minimum / Optimum)." };
     }
     return { ok: true, records };
   } catch (e) {
@@ -195,22 +243,59 @@ export async function parseLevels(base64: string): Promise<LevelsParseResult> {
   }
 }
 
+// Doplní hladiny: nejdřív spáruje podle M-kódu (sku), zbytek podle přesného názvu.
 export async function runLevelsImport(
   records: LevelRecord[],
-): Promise<{ ok: boolean; updated?: number; notFound?: number; error?: string }> {
+): Promise<{ ok: boolean; updated?: number; notFound?: number; ambiguous?: number; error?: string }> {
   await requireRole("MANAGER");
   if (!Array.isArray(records) || records.length === 0) return { ok: false, error: "Není co importovat." };
+
+  const products = await db.product.findMany({ select: { id: true, sku: true, name: true } });
+  const norm = (x: string) => x.trim().toLowerCase().replace(/\s+/g, " ");
+  const bySku = new Map<string, string>();
+  const byName = new Map<string, string[]>();
+  for (const p of products) {
+    if (p.sku) bySku.set(p.sku.trim().toLowerCase(), p.id);
+    const k = norm(p.name);
+    byName.set(k, [...(byName.get(k) ?? []), p.id]);
+  }
+
+  const done = new Set<string>();
   let updated = 0;
   let notFound = 0;
-  for (const r of records) {
-    const res = await db.product.updateMany({
-      where: { sku: r.sku },
+  let ambiguous = 0;
+
+  const apply = async (id: string, r: LevelRecord) => {
+    await db.product.update({
+      where: { id },
       data: { minQuantity: Math.max(0, r.min), optimalQuantity: Math.max(0, r.opt), trackLevels: true },
     });
-    if (res.count > 0) updated++;
+    done.add(id);
+    updated++;
+  };
+
+  // 1) párování podle M-kódu
+  const rest: LevelRecord[] = [];
+  for (const r of records) {
+    const sku = r.sku ? r.sku.trim().toLowerCase() : "";
+    const id = sku ? bySku.get(sku) : undefined;
+    if (id) {
+      if (!done.has(id)) await apply(id, r);
+    } else {
+      rest.push(r);
+    }
+  }
+
+  // 2) zbytek podle přesného názvu (jen když je shoda jednoznačná)
+  for (const r of rest) {
+    const nm = r.name ? norm(r.name) : "";
+    const fresh = (nm ? byName.get(nm) ?? [] : []).filter((id) => !done.has(id));
+    if (fresh.length === 1) await apply(fresh[0], r);
+    else if (fresh.length > 1) ambiguous++;
     else notFound++;
   }
+
   revalidatePath("/produkty");
   revalidatePath("/dashboard");
-  return { ok: true, updated, notFound };
+  return { ok: true, updated, notFound, ambiguous };
 }

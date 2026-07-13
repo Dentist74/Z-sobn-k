@@ -18,8 +18,10 @@ export default async function ImportPage() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Import produktů</h1>
         <p className="mt-1 text-slate-500">
-          Naimportuj skladové karty z exportu Evidentistu (.xlsx). Položky se párují
-          podle M-kódu — existující se aktualizují, nové se založí.
+          Naimportuj skladové karty z exportu Evidentistu (.xlsx / .csv). Před importem
+          si můžeš odškrtat položky, které nechceš. Párování probíhá podle M-kódu, u položek
+          bez M-kódu podle názvu — existující se aktualizují, nové se založí. Volitelně se
+          naimportují i počty ks skladem.
         </p>
       </div>
       <ImportProducts warehouses={warehouses} />
