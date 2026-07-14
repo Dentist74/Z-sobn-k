@@ -54,12 +54,14 @@ export function ProductsTable({
   rows,
   warehouses,
   suppliers = [],
+  categoryOptions = [],
   showPrices,
   canManage,
 }: {
   rows: ProductRowVM[];
   warehouses: { id: string; name: string }[];
   suppliers?: { id: string; name: string }[];
+  categoryOptions?: string[]; // celý číselník kategorií (i ty, které zatím žádná karta nemá)
   showPrices: boolean;
   canManage: boolean;
 }) {
@@ -81,9 +83,14 @@ export function ProductsTable({
   const [bPrice, setBPrice] = useState("");
   const [bTrack, setBTrack] = useState("");
 
+  // číselník + kategorie použité na kartách (kdyby číselník nebyl úplný)
   const categories = useMemo(
-    () => [...new Set(rows.map((r) => r.category).filter((c): c is string => !!c))].sort(),
-    [rows],
+    () =>
+      [...new Set([
+        ...categoryOptions,
+        ...rows.map((r) => r.category).filter((c): c is string => !!c),
+      ])].sort(),
+    [rows, categoryOptions],
   );
 
   const filtered = useMemo(() => {

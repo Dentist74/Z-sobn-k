@@ -113,7 +113,9 @@ export default async function ProductsPage() {
         </div>
       </div>
 
-      <ProductsTable rows={rows} warehouses={warehouses} suppliers={suppliers} showPrices={showPrices} canManage={canEdit} />
+      <ProductsTable rows={rows} warehouses={warehouses} suppliers={suppliers}
+        categoryOptions={categories.map((c) => c.name)}
+        showPrices={showPrices} canManage={canEdit} />
     </div>
   );
 }
