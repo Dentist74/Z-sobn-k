@@ -110,6 +110,7 @@ model StorageBin {
 model Category {
   id        String   @id @default(cuid())
   name      String   @unique
+  color     String? // barva kategorie (hex) — barevný proužek v seznamu karet
   createdAt DateTime @default(now())
 }
 

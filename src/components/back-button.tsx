@@ -3,18 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { NAV_ITEMS, SETTINGS_ITEMS } from "@/lib/nav";
+import { NAV_ITEMS, SETTINGS_ITEMS, REPORT_ITEMS } from "@/lib/nav";
 import { useNavGuard } from "@/components/nav-guard";
 
 // Kořeny sekcí (hlavní menu) — tam tlačítko Zpět nedává smysl.
 const SECTION_ROOTS = NAV_ITEMS.map((i) => i.href);
 // Položky pod Nastavením — vždy zpět na rozcestník Nastavení.
 const SETTINGS_CHILDREN = SETTINGS_ITEMS.map((i) => i.href);
+// Položky pod Reporty (Spotřeba, Doklady, Historie…) — zpět na rozcestník Reporty.
+const REPORT_CHILDREN = REPORT_ITEMS.map((i) => i.href);
 
 // Vrátí logického rodiče v rámci stejné kategorie (ne podle historie prohlížeče).
 function parentOf(path: string): string | null {
   if (SECTION_ROOTS.includes(path)) return null; // kořen sekce → bez Zpět
   if (SETTINGS_CHILDREN.includes(path)) return "/nastaveni";
+  if (REPORT_CHILDREN.includes(path)) return "/reporty";
   const idx = path.lastIndexOf("/");
   if (idx <= 0) return null;
   return path.slice(0, idx) || null;

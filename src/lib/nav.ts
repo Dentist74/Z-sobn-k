@@ -7,8 +7,8 @@ export type NavItem = {
   roles?: Role[]; // pokud nevyplněno → vidí všichni přihlášení
 };
 
+// Pozn.: „Pracovní mód" není v NAV_ITEMS — má vlastní tlačítko v patičce sidebaru.
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/m", label: "Pracovní mód", icon: "Smartphone" },
   { href: "/dashboard", label: "Přehled", icon: "LayoutDashboard" },
   { href: "/naskladneni", label: "Naskladnění", icon: "PackagePlus" },
   { href: "/vydej", label: "Výdej", icon: "PackageMinus" },

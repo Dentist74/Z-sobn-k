@@ -30,6 +30,7 @@ export type ProductRowVM = {
   sku: string;
   codes: string[];
   category: string | null;
+  categoryColor: string | null;
   totalQtyLabel: string;
   minQtyLabel: string;
   optQtyLabel: string;
@@ -365,11 +366,15 @@ export function ProductsTable({
               return (
               <TableRow key={r.id} data-pid={r.id} className={!r.active ? "opacity-50" : ""}>
                 {canManage && (
-                  <TableCell>
+                  <TableCell className="border-l-4"
+                    style={{ borderLeftColor: r.categoryColor ?? "transparent" }}>
                     <input type="checkbox" className="size-4" checked={selected.has(r.id)} onChange={() => toggleSel(r.id)} />
                   </TableCell>
                 )}
-                <TableCell className="font-medium">
+                <TableCell
+                  className={"font-medium" + (canManage ? "" : " border-l-4")}
+                  style={canManage ? undefined : { borderLeftColor: r.categoryColor ?? "transparent" }}
+                >
                   <Link href={`/produkty/${r.id}`} onClick={() => rememberRow(r.id)} className="hover:underline">{r.name}</Link>
                   {r.category && <span className="block text-xs text-slate-400">{r.category}</span>}
                 </TableCell>

@@ -6,17 +6,37 @@ import { requireRole } from "@/lib/dal";
 
 export type CategoryActionResult = { ok: boolean; error?: string };
 
-export async function createCategory(name: string): Promise<CategoryActionResult> {
+const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
+export async function createCategory(
+  name: string,
+  color?: string | null,
+): Promise<CategoryActionResult> {
   await requireRole("MANAGER");
   const n = name.trim();
   if (n.length < 1) return { ok: false, error: "Zadej název kategorie." };
+  const c = color && COLOR_RE.test(color) ? color : null;
   try {
-    await db.category.create({ data: { name: n } });
+    await db.category.create({ data: { name: n, color: c } });
   } catch {
     return { ok: false, error: "Taková kategorie už existuje." };
   }
   revalidatePath("/kategorie");
   revalidatePath("/produkty/novy");
+  revalidatePath("/produkty");
+  return { ok: true };
+}
+
+// Změní barvu existující kategorie (null = bez barvy).
+export async function setCategoryColor(
+  id: string,
+  color: string | null,
+): Promise<CategoryActionResult> {
+  await requireRole("MANAGER");
+  const c = color && COLOR_RE.test(color) ? color : null;
+  await db.category.update({ where: { id }, data: { color: c } });
+  revalidatePath("/kategorie");
+  revalidatePath("/produkty");
   return { ok: true };
 }
 

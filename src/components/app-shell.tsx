@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, Smartphone } from "lucide-react";
 import { NavLinks } from "@/components/nav-links";
 import { UserMenu } from "@/components/user-menu";
 import { LogoutButton } from "@/components/logout-button";
@@ -67,6 +67,18 @@ export function AppShell({
         </div>
 
         <div className="space-y-1 border-t border-white/10 p-3">
+          {/* Přepnutí do zjednodušeného pracovního módu — dole nad uživatelem */}
+          <Link
+            href="/m"
+            title="Pracovní mód"
+            className={cn(
+              "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-[#C7D8EC] hover:bg-white/10 hover:text-white",
+              collapsed && "justify-center px-0",
+            )}
+          >
+            <Smartphone className="size-4 shrink-0" />
+            {!collapsed && "Pracovní mód"}
+          </Link>
           {collapsed ? (
             <LogoutButton dark collapsed />
           ) : (
@@ -84,6 +96,10 @@ export function AppShell({
           <MobileNav items={items} user={user} />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand-logo.png" alt="Svět úsměvů" className="h-7 w-auto" />
+          <Link href="/m" title="Pracovní mód"
+            className="ml-auto flex size-9 items-center justify-center rounded-lg text-[#C7D8EC] hover:bg-white/10 hover:text-white">
+            <Smartphone className="size-5" />
+          </Link>
         </header>
 
         <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-8">

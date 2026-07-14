@@ -17,7 +17,7 @@ export default async function ProductsPage() {
   const showPrices = can(user, "MANAGER");
   const canEdit = can(user, "MANAGER");
 
-  const [products, warehouses, suppliers] = await Promise.all([
+  const [products, warehouses, suppliers, categories] = await Promise.all([
     getProductsWithStock(),
     db.warehouse.findMany({
       where: { active: true },
@@ -29,7 +29,11 @@ export default async function ProductsPage() {
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
+    db.category.findMany({ select: { name: true, color: true } }),
   ]);
+
+  // barva kategorie → barevný proužek na řádku
+  const colorByCategory = new Map(categories.map((c) => [c.name, c.color]));
 
   const rows: ProductRowVM[] = products.map((p) => {
     // rozpad po skladech: sklady, kde má položka zásobu NEBO nastavenou hladinu
@@ -58,6 +62,7 @@ export default async function ProductsPage() {
       sku: p.sku,
       codes: p.codes,
       category: p.category,
+      categoryColor: (p.category ? colorByCategory.get(p.category) : null) ?? null,
       totalQtyLabel: formatQty(p.totalQty, p.unit),
       minQtyLabel: p.minQuantity ? formatQty(p.minQuantity, p.unit) : "—",
       optQtyLabel: p.optimalQuantity ? formatQty(p.optimalQuantity, p.unit) : "—",
