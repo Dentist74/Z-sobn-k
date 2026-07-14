@@ -19,6 +19,7 @@ import {
   FileText,
   BarChart3,
   CalendarClock,
+  Smartphone,
   type LucideProps,
 } from "lucide-react";
 
@@ -43,6 +44,7 @@ const ICONS = {
   FileText,
   BarChart3,
   CalendarClock,
+  Smartphone,
 } as const;
 
 export type IconName = keyof typeof ICONS;

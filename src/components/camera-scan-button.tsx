@@ -10,9 +10,11 @@ import { Camera, X } from "lucide-react";
 export function CameraScanButton({
   onScan,
   className,
+  label = "Fotoaparát",
 }: {
   onScan: (code: string) => void;
   className?: string;
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export function CameraScanButton({
           "inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm text-slate-700 hover:bg-slate-50"
         }
       >
-        <Camera className="size-4" /> Fotoaparát
+        <Camera className="size-4" /> {label}
       </button>
 
       {open && (

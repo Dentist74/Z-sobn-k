@@ -90,7 +90,7 @@ function PinPanel({ users }: { users: PinUser[] }) {
         setPin("");
         return;
       }
-      router.push("/dashboard");
+      router.push(res.redirectTo ?? "/dashboard");
       router.refresh();
     });
   }

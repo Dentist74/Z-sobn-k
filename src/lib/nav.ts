@@ -9,6 +9,7 @@ export type NavItem = {
 
 export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Přehled", icon: "LayoutDashboard" },
+  { href: "/m", label: "Pracovní mód", icon: "Smartphone" },
   { href: "/naskladneni", label: "Naskladnění", icon: "PackagePlus" },
   { href: "/vydej", label: "Výdej", icon: "PackageMinus" },
   { href: "/produkty", label: "Skladové karty", icon: "Boxes" },

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/dal";
 import { navItemsForRole } from "@/lib/nav";
 import { getSystemSettings } from "@/lib/settings";
@@ -11,6 +12,8 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const user = await requireUser();
+  // Běžný uživatel pracuje jen ve zjednodušeném pracovním módu.
+  if (user.role === "STAFF") redirect("/m");
   const items = navItemsForRole(user.role);
   const settings = await getSystemSettings();
 

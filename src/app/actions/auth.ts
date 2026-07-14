@@ -13,6 +13,12 @@ const LoginSchema = z.object({
 
 export type LoginState = { error?: string } | undefined;
 
+// Kam po přihlášení: běžný uživatel rovnou do pracovního módu,
+// vedení si vybere mezi pracovním a správním módem.
+function homeForRole(role: string): string {
+  return role === "STAFF" ? "/m" : "/vyber-modu";
+}
+
 export async function login(
   _prev: LoginState,
   formData: FormData,
@@ -41,7 +47,7 @@ export async function login(
   if (!ok) return invalid;
 
   await createSession(user.id);
-  redirect("/dashboard");
+  redirect(homeForRole(user.role));
 }
 
 export async function logout() {
@@ -66,7 +72,7 @@ export async function listPinUsers(): Promise<PinUser[]> {
 export async function loginWithPin(
   userId: string,
   pin: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; redirectTo?: string }> {
   if (!/^\d{4}$/.test(pin)) return { ok: false, error: "PIN má 4 číslice." };
   const user = await db.user.findUnique({ where: { id: userId } });
   if (!user || !user.active || !user.pinHash) {
@@ -75,5 +81,5 @@ export async function loginWithPin(
   const ok = await bcrypt.compare(pin, user.pinHash);
   if (!ok) return { ok: false, error: "Nesprávný PIN." };
   await createSession(user.id);
-  return { ok: true };
+  return { ok: true, redirectTo: homeForRole(user.role) };
 }

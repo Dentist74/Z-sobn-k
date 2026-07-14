@@ -56,7 +56,7 @@ export async function registerOwner(_prev: FormState, formData: FormData): Promi
     },
   });
   await createSession(user.id);
-  redirect("/dashboard");
+  redirect("/vyber-modu");
 }
 
 // Vytvoří pozvánku (odkaz). MANAGER smí zvát jen běžné uživatele.
@@ -166,5 +166,5 @@ export async function acceptInvite(_prev: FormState, formData: FormData): Promis
     await db.invitation.update({ where: { id: inv.id }, data: { acceptedAt: new Date() } });
   }
   await createSession(user.id);
-  redirect("/dashboard");
+  redirect(inv.role === "STAFF" ? "/m" : "/vyber-modu");
 }

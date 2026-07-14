@@ -349,6 +349,36 @@ export async function fixPackagingFromName(
   return { ok: true, fixed, skipped, samples };
 }
 
+// Vygeneruje položce interní EAN-13 (prefix 299 = vnitřní použití) a uloží ho.
+// Vrací kód pro zobrazení/tisk štítku.
+export async function assignGeneratedEan(
+  productId: string,
+): Promise<{ ok: boolean; code?: string; error?: string }> {
+  await requireRole("MANAGER");
+  const product = await db.product.findUnique({ where: { id: productId }, select: { id: true } });
+  if (!product) return { ok: false, error: "Položka nenalezena." };
+
+  const existing = new Set(
+    (await db.productBarcode.findMany({ select: { code: true } })).map((b) => b.code),
+  );
+  const gen = (): string => {
+    let d = "299";
+    for (let i = 0; i < 9; i++) d += Math.floor(Math.random() * 10);
+    let sum = 0;
+    for (let i = 0; i < 12; i++) sum += Number(d[i]) * (i % 2 === 0 ? 1 : 3);
+    return d + String((10 - (sum % 10)) % 10);
+  };
+  let code = gen();
+  let guard = 0;
+  while (existing.has(code) && guard++ < 50) code = gen();
+  if (existing.has(code)) return { ok: false, error: "Nepodařilo se vygenerovat unikátní kód." };
+
+  await db.productBarcode.create({ data: { productId, code } });
+  revalidatePath("/produkty");
+  revalidatePath(`/produkty/${productId}`);
+  return { ok: true, code };
+}
+
 // Rychlá úprava základních polí přímo z detailu karty.
 export async function updateProductQuick(
   id: string,
