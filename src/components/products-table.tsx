@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { toggleProductActive, deleteProduct, bulkUpdateProducts, bulkDeleteProducts, deleteAllProducts, recalcPackagePrices } from "@/app/actions/products";
+import { toggleProductActive, deleteProduct, bulkUpdateProducts, bulkDeleteProducts, deleteAllProducts, fixPackagingFromName } from "@/app/actions/products";
 import { CameraScanButton } from "@/components/camera-scan-button";
 
 export type ProductRowVM = {
@@ -161,17 +161,19 @@ export function ProductsTable({
     });
   }
 
-  function recalcPrices() {
+  function fixPackaging() {
     if (selected.size === 0) return;
     if (!confirm(
-      `Přepočítat cenu z „za balení" na „za kus" u ${selected.size} vybraných položek?\n\n` +
-      `U balených (víc ks/bal) se cena vydělí počtem ks (např. 595/bal ÷ 5 = 119/ks), včetně cen šarží.\n` +
-      `Nebalené se nemění. Spouštěj jen JEDNOU (opakování cenu vydělí znovu).`,
+      `Opravit balení a cenu u ${selected.size} vybraných položek?\n\n` +
+      `U nebalených položek, kde je v názvu jasně velikost balení (např. „5ks/bal", „blistr 6ks", „(100 ks)"), ` +
+      `se nastaví balení a cena se přepočítá na kus (595/bal ÷ 5 = 119/ks), včetně cen šarží.\n\n` +
+      `Bezpečné: položky bez jasné značky i už označené jako balení se nemění. Můžeš spustit opakovaně.`,
     )) return;
     startTransition(async () => {
-      const res = await recalcPackagePrices([...selected]);
-      if (!res.ok) { toast.error(res.error ?? "Přepočet selhal."); return; }
-      toast.success(`Přepočítáno u ${res.fixed} balených položek${res.skipped ? ` (${res.skipped} nebalených beze změny)` : ""}.`);
+      const res = await fixPackagingFromName([...selected]);
+      if (!res.ok) { toast.error(res.error ?? "Oprava selhala."); return; }
+      toast.success(`Opraveno ${res.fixed} položek (balení + cena). ${res.skipped ?? 0} beze změny.`);
+      if (res.samples && res.samples.length) console.log("Opravené položky (ukázka):\n" + res.samples.join("\n"));
       setSelected(new Set());
       router.refresh();
     });
@@ -255,8 +257,8 @@ export function ProductsTable({
             <Button size="sm" variant="outline" onClick={() => setBulkOpen((v) => !v)}>
               <SlidersHorizontal className="size-4" /> Hromadná úprava
             </Button>
-            <Button size="sm" variant="outline" onClick={recalcPrices} disabled={pending}>
-              <Calculator className="size-4" /> Přepočítat cenu /bal → /ks
+            <Button size="sm" variant="outline" onClick={fixPackaging} disabled={pending}>
+              <Calculator className="size-4" /> Opravit balení + cenu z názvu
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
               <X className="size-4" /> Zrušit výběr

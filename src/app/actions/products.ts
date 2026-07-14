@@ -280,6 +280,75 @@ export async function recalcPackagePrices(
   return { ok: true, fixed, skipped };
 }
 
+// Bezpečné odvození velikosti balení z názvu — jen z jednoznačných značek „ks".
+// Záměrně NEbere rozměry (40 x 19 x 15) ani „4x300g" apod. Vrátí 0, když nic jistého.
+const PACK_PATTERNS = [
+  /(\d+)\s*ks\s*\/\s*bal/i, // "5ks/bal"
+  /blistr\s*(\d+)\s*ks/i, // "blistr 6ks"
+  /\/\s*bal\.?\s*(\d+)\s*ks/i, // "/bal. 5ks"
+  /\((\d+)\s*ks\)/i, // "(36ks)", "(100 ks)"
+  /(\d+)\s*ks\s*\)/i, // "…5ks)"
+];
+function detectPackFromName(name: string): number {
+  for (const re of PACK_PATTERNS) {
+    const m = name.match(re);
+    if (m) {
+      const n = Number(m[1]);
+      if (Number.isFinite(n) && n > 1) return n;
+    }
+  }
+  return 0;
+}
+
+// Hromadně: u vybraných NEbalených položek (ppp=1) odvodí balení z názvu, nastaví ho
+// a přepočítá cenu (za balení → za kus), včetně cen šarží. Idempotentní: balené přeskočí.
+export async function fixPackagingFromName(
+  ids: string[],
+): Promise<{ ok: boolean; fixed?: number; skipped?: number; samples?: string[]; error?: string }> {
+  await requireRole("MANAGER");
+  const clean = [...new Set(ids.filter(Boolean))];
+  if (clean.length === 0) return { ok: false, error: "Nic nevybráno." };
+
+  const round2 = (x: number) => Math.round(x * 100) / 100;
+  const prods = await db.product.findMany({
+    where: { id: { in: clean } },
+    select: { id: true, name: true, piecesPerPackage: true, pricePurchase: true },
+  });
+
+  let fixed = 0;
+  let skipped = 0;
+  const samples: string[] = [];
+  for (const p of prods) {
+    if (p.piecesPerPackage > 1) { skipped++; continue; } // už balené — nesaháme (necháme cenu být)
+    const pack = detectPackFromName(p.name);
+    if (pack <= 1) { skipped++; continue; }
+    const oldPrice = Number(p.pricePurchase);
+    const newPrice = round2(oldPrice / pack);
+    await db.$transaction(async (tx) => {
+      await tx.product.update({
+        where: { id: p.id },
+        data: { piecesPerPackage: pack, packageLabel: "balení", pricePurchase: newPrice },
+      });
+      const batches = await tx.stockBatch.findMany({
+        where: { productId: p.id, pricePurchase: { not: null } },
+        select: { id: true, pricePurchase: true },
+      });
+      for (const b of batches) {
+        await tx.stockBatch.update({
+          where: { id: b.id },
+          data: { pricePurchase: round2(Number(b.pricePurchase) / pack) },
+        });
+      }
+    });
+    if (samples.length < 6) samples.push(`${p.name.slice(0, 34)} → ${pack} ks/bal, ${oldPrice}→${newPrice} Kč/ks`);
+    fixed++;
+  }
+
+  revalidatePath("/produkty");
+  revalidatePath("/dashboard");
+  return { ok: true, fixed, skipped, samples };
+}
+
 // Rychlá úprava základních polí přímo z detailu karty.
 export async function updateProductQuick(
   id: string,
