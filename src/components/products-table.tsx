@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Search, MoreVertical, Pencil, Power, Trash2, SlidersHorizontal, Check, X } from "lucide-react";
+import { Search, MoreVertical, Pencil, Power, Trash2, SlidersHorizontal, Check, X, Calculator } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { toggleProductActive, deleteProduct, bulkUpdateProducts, bulkDeleteProducts, deleteAllProducts } from "@/app/actions/products";
+import { toggleProductActive, deleteProduct, bulkUpdateProducts, bulkDeleteProducts, deleteAllProducts, recalcPackagePrices } from "@/app/actions/products";
 import { CameraScanButton } from "@/components/camera-scan-button";
 
 export type ProductRowVM = {
@@ -161,6 +161,22 @@ export function ProductsTable({
     });
   }
 
+  function recalcPrices() {
+    if (selected.size === 0) return;
+    if (!confirm(
+      `Přepočítat cenu z „za balení" na „za kus" u ${selected.size} vybraných položek?\n\n` +
+      `U balených (víc ks/bal) se cena vydělí počtem ks (např. 595/bal ÷ 5 = 119/ks), včetně cen šarží.\n` +
+      `Nebalené se nemění. Spouštěj jen JEDNOU (opakování cenu vydělí znovu).`,
+    )) return;
+    startTransition(async () => {
+      const res = await recalcPackagePrices([...selected]);
+      if (!res.ok) { toast.error(res.error ?? "Přepočet selhal."); return; }
+      toast.success(`Přepočítáno u ${res.fixed} balených položek${res.skipped ? ` (${res.skipped} nebalených beze změny)` : ""}.`);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
   function removeSelected() {
     if (selected.size === 0) return;
     if (!confirm(`Opravdu SMAZAT ${selected.size} vybraných položek včetně skladové historie (pohyby, šarže)? Nevratné.`)) return;
@@ -238,6 +254,9 @@ export function ProductsTable({
             <span className="text-sm font-medium text-[#103D63]">Vybráno {selected.size}</span>
             <Button size="sm" variant="outline" onClick={() => setBulkOpen((v) => !v)}>
               <SlidersHorizontal className="size-4" /> Hromadná úprava
+            </Button>
+            <Button size="sm" variant="outline" onClick={recalcPrices} disabled={pending}>
+              <Calculator className="size-4" /> Přepočítat cenu /bal → /ks
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
               <X className="size-4" /> Zrušit výběr

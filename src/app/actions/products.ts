@@ -235,6 +235,51 @@ export async function bulkUpdateProducts(
   return { ok: true, message: `Upraveno ${ids.length} položek.` };
 }
 
+// Hromadný přepočet ceny „za balení → za kus" u vybraných balených položek (piecesPerPackage>1).
+// Vydělí referenční cenu produktu i ceny jednotlivých šarží počtem ks v balení.
+// POZOR: spouštět jen jednou (opětovné spuštění by cenu vydělilo znovu).
+export async function recalcPackagePrices(
+  ids: string[],
+): Promise<{ ok: boolean; fixed?: number; skipped?: number; error?: string }> {
+  await requireRole("MANAGER");
+  const clean = [...new Set(ids.filter(Boolean))];
+  if (clean.length === 0) return { ok: false, error: "Nic nevybráno." };
+
+  const round2 = (x: number) => Math.round(x * 100) / 100;
+  const prods = await db.product.findMany({
+    where: { id: { in: clean } },
+    select: { id: true, piecesPerPackage: true, pricePurchase: true },
+  });
+
+  let fixed = 0;
+  let skipped = 0;
+  for (const p of prods) {
+    const ppp = p.piecesPerPackage;
+    if (!(ppp > 1)) { skipped++; continue; } // nebalené necháme být
+    await db.$transaction(async (tx) => {
+      await tx.product.update({
+        where: { id: p.id },
+        data: { pricePurchase: round2(Number(p.pricePurchase) / ppp) },
+      });
+      const batches = await tx.stockBatch.findMany({
+        where: { productId: p.id, pricePurchase: { not: null } },
+        select: { id: true, pricePurchase: true },
+      });
+      for (const b of batches) {
+        await tx.stockBatch.update({
+          where: { id: b.id },
+          data: { pricePurchase: round2(Number(b.pricePurchase) / ppp) },
+        });
+      }
+    });
+    fixed++;
+  }
+
+  revalidatePath("/produkty");
+  revalidatePath("/dashboard");
+  return { ok: true, fixed, skipped };
+}
+
 // Rychlá úprava základních polí přímo z detailu karty.
 export async function updateProductQuick(
   id: string,
