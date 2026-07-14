@@ -47,7 +47,7 @@ export default async function DashboardPage() {
         name: o.name,
         valueLabel: formatCZK(o.value),
       })),
-      topProducts: consumption.byProduct.slice(0, 10).map((p) => ({
+      topProducts: consumption.byProduct.map((p) => ({
         productId: p.productId,
         name: p.name,
         qtyLabel: formatQty(p.qty, p.unit),

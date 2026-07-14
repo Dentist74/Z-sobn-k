@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Wallet,
@@ -64,6 +64,16 @@ type PanelKey = "value" | "belowMin" | "expiring" | "expired" | "incomplete";
 export function DashboardPanels({ vm }: { vm: DashboardVM }) {
   const [open, setOpen] = useState<PanelKey | null>(null);
   const toggle = (k: PanelKey) => setOpen((p) => (p === k ? null : k));
+  const detailRef = useRef<HTMLDivElement>(null);
+
+  // Na mobilu sjeď na rozbalený seznam (na desktopu je vidět rovnou).
+  useEffect(() => {
+    if (open && window.innerWidth < 1024) {
+      requestAnimationFrame(() => {
+        detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+  }, [open]);
 
   return (
     <div className="space-y-6">
@@ -107,6 +117,7 @@ export function DashboardPanels({ vm }: { vm: DashboardVM }) {
       )}
 
       {/* Detail pod bublinami */}
+      <div ref={detailRef} className="scroll-mt-4 space-y-6">
       {open === "value" && (
         <section className="space-y-3">
           <h2 className="text-lg font-semibold text-slate-900">
@@ -245,7 +256,7 @@ export function DashboardPanels({ vm }: { vm: DashboardVM }) {
                     </TableCell>
                   </TableRow>
                 )}
-                {vm.incomplete.slice(0, 30).map((p) => (
+                {vm.incomplete.map((p) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">
                       <Link href={`/produkty/${p.id}`} className="hover:underline">{p.name}</Link>
@@ -274,14 +285,10 @@ export function DashboardPanels({ vm }: { vm: DashboardVM }) {
                 ))}
               </TableBody>
             </Table>
-            {vm.incomplete.length > 30 && (
-              <p className="px-4 py-2 text-xs text-slate-400">
-                …a dalších {vm.incomplete.length - 30}.
-              </p>
-            )}
           </div>
         </section>
       )}
+      </div>
     </div>
   );
 }

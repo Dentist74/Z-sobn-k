@@ -8,8 +8,8 @@ export type NavItem = {
 };
 
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "Přehled", icon: "LayoutDashboard" },
   { href: "/m", label: "Pracovní mód", icon: "Smartphone" },
+  { href: "/dashboard", label: "Přehled", icon: "LayoutDashboard" },
   { href: "/naskladneni", label: "Naskladnění", icon: "PackagePlus" },
   { href: "/vydej", label: "Výdej", icon: "PackageMinus" },
   { href: "/produkty", label: "Skladové karty", icon: "Boxes" },
@@ -25,40 +25,18 @@ export const NAV_ITEMS: NavItem[] = [
     icon: "ClipboardList",
     roles: ["MANAGER"],
   },
-  {
-    href: "/objednavky",
-    label: "Objednávky",
-    icon: "ShoppingCart",
-    roles: ["MANAGER"],
-  },
+  // Objednávky zatím schované z menu (routy zůstávají — na přání se vrátí).
   {
     href: "/expirace",
     label: "Expirace",
     icon: "CalendarClock",
     roles: ["MANAGER"],
   },
-  {
-    href: "/spotreba",
-    label: "Spotřeba materiálu",
-    icon: "ChartPie",
-    roles: ["MANAGER"],
-  },
+  // Hub: Spotřeba materiálu, Doklady a Historie akcí žijí pod Reporty.
   {
     href: "/reporty",
     label: "Reporty",
     icon: "BarChart3",
-    roles: ["MANAGER"],
-  },
-  {
-    href: "/doklady",
-    label: "Doklady",
-    icon: "FileText",
-    roles: ["MANAGER"],
-  },
-  {
-    href: "/historie",
-    label: "Historie akcí",
-    icon: "History",
     roles: ["MANAGER"],
   },
   {
@@ -67,6 +45,14 @@ export const NAV_ITEMS: NavItem[] = [
     icon: "Settings",
     roles: ["MANAGER"],
   },
+];
+
+// Položky hubu Reporty (stránka /reporty).
+export const REPORT_ITEMS: NavItem[] = [
+  { href: "/reporty/naklady", label: "Náklady a grafy", icon: "BarChart3" },
+  { href: "/spotreba", label: "Spotřeba materiálu", icon: "ChartPie" },
+  { href: "/doklady", label: "Doklady", icon: "FileText" },
+  { href: "/historie", label: "Historie akcí", icon: "History" },
 ];
 
 // Položky pod sekcí Nastavení (hub stránka /nastaveni).
