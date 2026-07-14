@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ScanLine, Plus, Check, X, FilePlus, Link2, RefreshCw } from "lucide-react";
+import { ScanLine, Plus, Check, X, FilePlus, Link2, RefreshCw, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -46,10 +46,13 @@ export function DeliveryScan({
   onAdd,
   products,
   canManage,
+  mobile = false,
 }: {
   onAdd: (p: AddPayload) => void;
   products: PickerProduct[];
   canManage: boolean;
+  // Pracovní mód: velké modré akční tlačítko „Vyfotit" přes celou šířku.
+  mobile?: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -204,12 +207,18 @@ export function DeliveryScan({
           <ScanLine className="size-4" />
           Načíst z dodacího listu (AI)
         </div>
-        <label className="cursor-pointer">
+        <label className={mobile ? "w-full cursor-pointer" : "cursor-pointer"}>
           <input type="file" accept="image/*" capture="environment" className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
-          <span className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-50">
-            {pending ? "Pracuji…" : "Vybrat / vyfotit"}
-          </span>
+          {mobile ? (
+            <span className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#103D63] text-base font-semibold text-white active:scale-[0.98]">
+              <Camera className="size-5" /> {pending ? "Pracuji…" : "Vyfotit"}
+            </span>
+          ) : (
+            <span className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-50">
+              {pending ? "Pracuji…" : "Vybrat / vyfotit"}
+            </span>
+          )}
         </label>
       </div>
 

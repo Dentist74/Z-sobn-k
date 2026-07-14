@@ -51,7 +51,7 @@ export default async function MobileHomePage() {
 
       {isManager && (
         <>
-          <Link href="/inventura" className={tileClass}>
+          <Link href="/m/inventura" className={tileClass}>
             <span className="flex size-16 items-center justify-center rounded-2xl bg-slate-200">
               <ClipboardList className="size-8 text-slate-700" />
             </span>

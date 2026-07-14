@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Barcode, Printer, RotateCcw, Plus } from "lucide-react";
-import { assignGeneratedEan } from "@/app/actions/products";
+import { Input } from "@/components/ui/input";
+import { assignGeneratedEan, createProductForEan } from "@/app/actions/products";
 import { barcodeUrl } from "@/lib/barcode";
 import { MobileItemSearch, type MobileProduct } from "@/components/mobile/mobile-ui";
 
@@ -15,6 +16,30 @@ export function MobileEan({ products }: { products: MobileProduct[] }) {
   const [pending, start] = useTransition();
   const [selected, setSelected] = useState<MobileProduct | null>(null);
   const [newCode, setNewCode] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+
+  // Založí novou kartu přímo tady (zůstáváme v pracovním módu) a rovnou
+  // jí vygeneruje EAN — detaily karty se doplní později ve správním módu.
+  function createNew() {
+    const name = newName.trim();
+    if (name.length < 2) { toast.error("Zadej název materiálu."); return; }
+    start(async () => {
+      const created = await createProductForEan(name);
+      if (!created.ok || !created.id) { toast.error(created.error ?? "Založení selhalo."); return; }
+      const ean = await assignGeneratedEan(created.id);
+      setSelected({ id: created.id, name, sku: created.sku ?? "", unit: "PCS", codes: [] });
+      if (ean.ok && ean.code) {
+        setNewCode(ean.code);
+        toast.success("Karta založena a EAN vygenerován.");
+      } else {
+        toast.success("Karta založena — vygeneruj jí EAN.");
+      }
+      setCreateOpen(false);
+      setNewName("");
+      router.refresh();
+    });
+  }
 
   function generate() {
     if (!selected) return;
@@ -76,10 +101,27 @@ export function MobileEan({ products }: { products: MobileProduct[] }) {
       <div className="rounded-2xl border bg-white p-3">
         <MobileItemSearch products={products} onPick={setSelected} placeholder="Najdi materiál…" />
       </div>
-      <Link href="/produkty/novy"
-        className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-white text-base font-medium text-slate-600 active:scale-[0.98]">
-        <Plus className="size-5" /> Materiál tu ještě není? Založit novou kartu
-      </Link>
+      {createOpen ? (
+        <div className="space-y-2 rounded-2xl border bg-white p-3">
+          <p className="text-sm font-medium text-slate-600">Nová položka</p>
+          <Input value={newName} onChange={(e) => setNewName(e.target.value)}
+            placeholder="Název materiálu…" className="h-12 text-base" autoFocus />
+          <button type="button" onClick={createNew} disabled={pending}
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#103D63] text-base font-semibold text-white disabled:opacity-50 active:scale-[0.98]">
+            <Plus className="size-5" /> {pending ? "Zakládám…" : "Založit a vygenerovat EAN"}
+          </button>
+          <button type="button" onClick={() => setCreateOpen(false)}
+            className="w-full text-center text-sm text-slate-500 underline">Zrušit</button>
+          <p className="text-xs text-slate-400">
+            Detaily karty (cena, balení, hladiny) se doplní později ve správním módu.
+          </p>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setCreateOpen(true)}
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-white text-base font-medium text-slate-600 active:scale-[0.98]">
+          <Plus className="size-5" /> Materiál tu ještě není? Založit novou kartu
+        </button>
+      )}
     </div>
   );
 }

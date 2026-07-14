@@ -349,6 +349,34 @@ export async function fixPackagingFromName(
   return { ok: true, fixed, skipped, samples };
 }
 
+// Rychlé založení karty z pracovního módu (obrazovka Přidělení EAN):
+// jen název, zbytek s výchozími hodnotami + needsReview → doplní se později.
+export async function createProductForEan(
+  name: string,
+): Promise<{ ok: boolean; id?: string; sku?: string; error?: string }> {
+  await requireRole("MANAGER");
+  const clean = (name ?? "").trim();
+  if (clean.length < 2) return { ok: false, error: "Zadej název položky." };
+
+  const slug = clean
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+    .slice(0, 24).replace(/-+$/, "") || "POLOZKA";
+  const used = new Set(
+    (await db.product.findMany({ where: { sku: { startsWith: slug } }, select: { sku: true } })).map((p) => p.sku),
+  );
+  let sku = slug;
+  let i = 2;
+  while (used.has(sku)) { sku = `${slug}-${i}`; i++; }
+
+  const p = await db.product.create({
+    data: { name: clean, sku, unit: "PCS", needsReview: true },
+    select: { id: true, sku: true },
+  });
+  revalidatePath("/produkty");
+  return { ok: true, id: p.id, sku: p.sku };
+}
+
 // Vygeneruje položce interní EAN-13 (prefix 299 = vnitřní použití) a uloží ho.
 // Vrací kód pro zobrazení/tisk štítku.
 export async function assignGeneratedEan(

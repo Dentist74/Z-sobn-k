@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Camera, Trash2, Check } from "lucide-react";
@@ -38,6 +38,58 @@ export function MobileReceive({
   const [warehouseId, setWarehouseId] = useState(defaultWarehouseId);
   const [rows, setRows] = useState<Row[]>([]);
   const [photo, setPhoto] = useState<{ base64: string; name: string; mediaType: string; dataUrl: string } | null>(null);
+
+  // Rozdělaná příjemka se průběžně ukládá v zařízení — neztratí se při
+  // odskočení jinam ani zavření prohlížeče. Po naskladnění se maže.
+  const DRAFT_KEY = "m-prijem-draft";
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw) as {
+        warehouseId?: string;
+        rows?: { id: string; q: number; lot: string; exp: string; price: number | null }[];
+      };
+      if (d.warehouseId && warehouses.some((w) => w.id === d.warehouseId)) {
+        setWarehouseId(d.warehouseId);
+      }
+      const restored: Row[] = (d.rows ?? [])
+        .map((r, i) => {
+          const p = products.find((x) => x.id === r.id);
+          if (!p) return null;
+          return {
+            key: `${p.id}-${i}`,
+            product: p,
+            quantity: r.q > 0 ? r.q : 1,
+            lotNumber: r.lot ?? "",
+            expiryDate: r.exp ?? "",
+            pricePurchase: r.price ?? null,
+          };
+        })
+        .filter((x): x is Row => x !== null);
+      if (restored.length > 0) {
+        setRows(restored);
+        toast.info("Obnovena rozdělaná příjemka.");
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (rows.length === 0) {
+        localStorage.removeItem(DRAFT_KEY);
+        return;
+      }
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({
+        warehouseId,
+        rows: rows.map((r) => ({
+          id: r.product.id, q: r.quantity, lot: r.lotNumber, exp: r.expiryDate, price: r.pricePurchase,
+        })),
+      }));
+    } catch {}
+  }, [rows, warehouseId]);
 
   function addProduct(p: MobileProduct, qty = 1, price: number | null = null) {
     setRows((prev) => {
@@ -107,6 +159,7 @@ export function MobileReceive({
       <DeliveryScan
         products={products}
         canManage={canManage}
+        mobile
         onAdd={(p) => {
           const prod = products.find((x) => x.id === p.productId);
           if (prod) addProduct(prod, p.quantity, p.unitPrice);
@@ -136,10 +189,18 @@ export function MobileReceive({
                 <span className="text-sm text-slate-500">ks</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <Input placeholder="Šarže (nepovinné)" value={r.lotNumber}
-                  onChange={(e) => patchRow(r.key, { lotNumber: e.target.value })} className="h-10 text-sm" />
-                <Input type="date" value={r.expiryDate} title="Expirace"
-                  onChange={(e) => patchRow(r.key, { expiryDate: e.target.value })} className="h-10 text-sm" />
+                <label className="min-w-0 space-y-0.5">
+                  <span className="text-xs text-slate-500">Šarže (nepovinné)</span>
+                  <Input value={r.lotNumber} placeholder="—"
+                    onChange={(e) => patchRow(r.key, { lotNumber: e.target.value })}
+                    className="h-10 w-full text-sm" />
+                </label>
+                <label className="min-w-0 space-y-0.5">
+                  <span className="text-xs text-slate-500">Expirace (nepovinné)</span>
+                  <Input type="date" value={r.expiryDate}
+                    onChange={(e) => patchRow(r.key, { expiryDate: e.target.value })}
+                    className="h-10 w-full min-w-0 appearance-none text-sm" />
+                </label>
               </div>
             </div>
           ))}
@@ -172,6 +233,11 @@ export function MobileReceive({
         <Check className="size-6" />
         {pending ? "Naskladňuji…" : `Naskladnit (${rows.length})`}
       </button>
+      {rows.length > 0 && (
+        <p className="text-center text-xs text-slate-400">
+          Rozdělaná příjemka je uložená — můžeš odskočit jinam a vrátit se k ní.
+        </p>
+      )}
     </div>
   );
 }
