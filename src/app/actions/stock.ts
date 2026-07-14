@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/dal";
+import { requireUser, requireRole } from "@/lib/dal";
 import { sortFEFO } from "@/lib/movements";
 import { toNumber } from "@/lib/format";
 
@@ -439,6 +439,87 @@ export async function quickAdjustStock(
   }
 
   revalidatePath("/produkty");
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
+// ADMIN oprava: nastaví přesný stav skladu na targetQty (rozdíl zaúčtuje jako ADJUSTMENT).
+// Auditní stopa zůstává (pohyby se nemažou). Jen pro ADMIN.
+export async function setStockQuantity(
+  productId: string,
+  targetQty: number,
+): Promise<StockActionResult> {
+  const user = await requireRole("ADMIN");
+  if (!Number.isFinite(targetQty) || targetQty < 0) {
+    return { ok: false, error: "Zadej platné množství (0 nebo víc)." };
+  }
+  try {
+    await db.$transaction(async (tx) => {
+      const product = await tx.product.findUnique({
+        where: { id: productId },
+        include: { batches: true },
+      });
+      if (!product) throw new Error("Položka nenalezena.");
+      const current = product.batches.reduce((s, b) => s + toNumber(b.quantity), 0);
+      const delta = Math.round((targetQty - current) * 1000) / 1000;
+      if (delta === 0) return;
+      const reason = "Oprava stavu (admin)";
+
+      if (delta > 0) {
+        let warehouseId: string | null =
+          product.defaultWarehouseId ?? product.batches[0]?.warehouseId ?? null;
+        if (!warehouseId) {
+          const wh = await tx.warehouse.findFirst({ where: { active: true } });
+          warehouseId = wh?.id ?? null;
+        }
+        if (!warehouseId) throw new Error("Není dostupný žádný sklad.");
+        const plain = product.batches.find(
+          (b) => b.warehouseId === warehouseId && !b.lotNumber && !b.expiryDate && toNumber(b.quantity) >= 0,
+        );
+        let batchId: string;
+        if (plain) {
+          await tx.stockBatch.update({
+            where: { id: plain.id },
+            data: { quantity: toNumber(plain.quantity) + delta },
+          });
+          batchId = plain.id;
+        } else {
+          const created = await tx.stockBatch.create({
+            data: {
+              productId: product.id,
+              warehouseId,
+              quantity: delta,
+              pricePurchase: toNumber(product.pricePurchase) || null,
+            },
+          });
+          batchId = created.id;
+        }
+        await tx.stockMovement.create({
+          data: { batchId, type: "ADJUSTMENT", quantity: delta, userId: user.id, reason },
+        });
+      } else {
+        let toRemove = -delta;
+        const sorted = sortFEFO(product.batches.filter((b) => toNumber(b.quantity) > 0));
+        const total = sorted.reduce((s, b) => s + toNumber(b.quantity), 0);
+        if (total <= 0) throw new Error("Skladem není žádné množství k odebrání.");
+        if (toRemove > total) toRemove = total;
+        for (const b of sorted) {
+          if (toRemove <= 0) break;
+          const avail = toNumber(b.quantity);
+          const take = Math.min(avail, toRemove);
+          await tx.stockBatch.update({ where: { id: b.id }, data: { quantity: avail - take } });
+          await tx.stockMovement.create({
+            data: { batchId: b.id, type: "ADJUSTMENT", quantity: -take, userId: user.id, reason },
+          });
+          toRemove -= take;
+        }
+      }
+    });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Oprava selhala." };
+  }
+  revalidatePath("/produkty");
+  revalidatePath(`/produkty/${productId}`);
   revalidatePath("/dashboard");
   return { ok: true };
 }

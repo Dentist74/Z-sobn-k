@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Pencil, PackagePlus, PackageMinus, Barcode } from "lucide-react";
 import { barcodeForProduct, barcodeUrl } from "@/lib/barcode";
 import { QuickProductSettings } from "@/components/quick-product-settings";
+import { AdminStockCorrection } from "@/components/admin-stock-correction";
 import { requireUser, can } from "@/lib/dal";
 import { db } from "@/lib/db";
 import { buttonVariants } from "@/components/ui/button";
@@ -34,6 +35,7 @@ export default async function ProductDetailPage({
   const user = await requireUser();
   const showPrices = can(user, "MANAGER");
   const canEdit = can(user, "MANAGER");
+  const isAdmin = can(user, "ADMIN");
   const { id } = await params;
 
   const product = await db.product.findUnique({
@@ -179,6 +181,14 @@ export default async function ProductDetailPage({
               packageLabel: product.packageLabel,
               trackLevels: product.trackLevels,
             }}
+          />
+        )}
+
+        {isAdmin && (
+          <AdminStockCorrection
+            productId={product.id}
+            currentQty={totalQty}
+            unitLabel={unitLabel}
           />
         )}
       </div>

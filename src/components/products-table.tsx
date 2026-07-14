@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Search, MoreVertical, Pencil, Power, Trash2, SlidersHorizontal, Check, X, Calculator } from "lucide-react";
@@ -105,8 +105,25 @@ export function ProductsTable({
   }, [q, wh, avail, cat, activeFilter, rows]);
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter" && filtered.length === 1) router.push(`/produkty/${filtered[0].id}`);
+    if (e.key === "Enter" && filtered.length === 1) {
+      rememberRow(filtered[0].id);
+      router.push(`/produkty/${filtered[0].id}`);
+    }
   }
+
+  // Zapamatuje si otevřenou položku, ať se na ni po návratu odroluje.
+  function rememberRow(id: string) {
+    try { sessionStorage.setItem("zsb:lastProduct", id); } catch {}
+  }
+  // Po návratu do seznamu odroluj na naposledy otevřenou kartu (ne na začátek).
+  useEffect(() => {
+    let id: string | null = null;
+    try { id = sessionStorage.getItem("zsb:lastProduct"); } catch {}
+    if (!id) return;
+    try { sessionStorage.removeItem("zsb:lastProduct"); } catch {}
+    const el = document.querySelector(`[data-pid="${id}"]`);
+    if (el) requestAnimationFrame(() => el.scrollIntoView({ block: "center" }));
+  }, []);
 
   function deactivate(id: string) {
     startTransition(async () => {
@@ -346,14 +363,14 @@ export function ProductsTable({
                 valueLabel: r.valueLabel, belowMin: r.belowMin, isZero: r.isZero,
               };
               return (
-              <TableRow key={r.id} className={!r.active ? "opacity-50" : ""}>
+              <TableRow key={r.id} data-pid={r.id} className={!r.active ? "opacity-50" : ""}>
                 {canManage && (
                   <TableCell>
                     <input type="checkbox" className="size-4" checked={selected.has(r.id)} onChange={() => toggleSel(r.id)} />
                   </TableCell>
                 )}
                 <TableCell className="font-medium">
-                  <Link href={`/produkty/${r.id}`} className="hover:underline">{r.name}</Link>
+                  <Link href={`/produkty/${r.id}`} onClick={() => rememberRow(r.id)} className="hover:underline">{r.name}</Link>
                   {r.category && <span className="block text-xs text-slate-400">{r.category}</span>}
                 </TableCell>
                 <TableCell className={"text-right tabular-nums font-medium " +
@@ -369,7 +386,7 @@ export function ProductsTable({
                 {showPrices && <TableCell className="text-right">{d.valueLabel}</TableCell>}
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
-                    <Link href={`/produkty/${r.id}`}
+                    <Link href={`/produkty/${r.id}`} onClick={() => rememberRow(r.id)}
                       className="inline-flex items-center rounded-md border px-2 py-1 text-xs text-slate-700 hover:bg-slate-50">
                       Otevřít
                     </Link>
