@@ -14,7 +14,7 @@ export default async function UsersPage() {
     db.invitation.findMany({
       where: { acceptedAt: null, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: "desc" },
-      select: { id: true, token: true, email: true, role: true },
+      select: { id: true, token: true, email: true, role: true, multiUse: true },
     }),
   ]);
 

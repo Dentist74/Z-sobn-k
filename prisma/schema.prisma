@@ -36,10 +36,11 @@ model Invitation {
   token       String    @unique
   email       String? // volitelně — když se posílá e-mailem
   role        String // MANAGER | STAFF
+  multiUse    Boolean   @default(false) // true = opakovaně použitelný odkaz (skupinová pozvánka)
   createdById String
   createdBy   User      @relation("InvitesCreated", fields: [createdById], references: [id])
   expiresAt   DateTime
-  acceptedAt  DateTime?
+  acceptedAt  DateTime? // u multiUse zůstává null (odkaz se nespotřebuje)
   createdAt   DateTime  @default(now())
 
   @@index([token])

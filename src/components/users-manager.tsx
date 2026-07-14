@@ -24,7 +24,7 @@ import {
   setUserRole,
   type UserActionResult,
 } from "@/app/actions/users";
-import { createInvite, sendInviteEmail, revokeInvite } from "@/app/actions/onboarding";
+import { createInvite, createGroupInvite, sendInviteEmail, revokeInvite } from "@/app/actions/onboarding";
 import { useDirty } from "@/components/nav-guard";
 import { ROLES, ROLE_LABELS, type Role } from "@/lib/enums";
 
@@ -42,6 +42,7 @@ export type InviteVM = {
   token: string;
   email: string | null;
   role: string;
+  multiUse: boolean;
 };
 
 function inviteLink(token: string) {
@@ -82,6 +83,15 @@ export function UsersManager({
         toast.success("Odkaz pozvánky zkopírován do schránky.");
       }
       setInviteEmail("");
+      router.refresh();
+    });
+  }
+  function makeGroupInvite() {
+    start(async () => {
+      const res = await createGroupInvite();
+      if (!res.ok || !res.token) { toast.error(res.error ?? "Vytvoření odkazu selhalo."); return; }
+      await navigator.clipboard.writeText(inviteLink(res.token)).catch(() => {});
+      toast.success("Skupinový odkaz zkopírován — vlož ho do WhatsApp skupiny.");
       router.refresh();
     });
   }
@@ -187,6 +197,23 @@ export function UsersManager({
           Vytvoř pozvánku podle role. Když vyplníš e-mail, pošle se na něj (jinak se
           odkaz zkopíruje do schránky). Odkaz je pro každou roli jiný.
         </p>
+
+        {/* Skupinový odkaz — do WhatsApp skupiny sestřiček */}
+        <div className="rounded-md border border-[#103D63]/20 bg-[#103D63]/5 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-medium text-[#103D63]">Skupinový odkaz pro sestřičky</p>
+              <p className="text-xs text-slate-500">
+                Jeden odkaz do WhatsApp skupiny — každá se přes něj zaregistruje sama (Běžný uživatel).
+                Opakovaně použitelný, platí 7 dní. Kdykoliv ho můžeš níže zneplatnit.
+              </p>
+            </div>
+            <Button type="button" disabled={pending} onClick={makeGroupInvite}>
+              <Link2 className="size-4" /> Vytvořit skupinový odkaz
+            </Button>
+          </div>
+        </div>
+
         <div className="flex flex-wrap items-end gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="inviteEmail">E-mail (volitelně)</Label>
@@ -212,7 +239,12 @@ export function UsersManager({
             {invites.map((inv) => (
               <div key={inv.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
                 <Badge variant="secondary">{ROLE_LABELS[inv.role as Role] ?? inv.role}</Badge>
-                <span className="text-slate-600">{inv.email ?? "odkaz (bez e-mailu)"}</span>
+                {inv.multiUse && (
+                  <Badge className="bg-[#103D63] text-white">skupinový · 7 dní · opakovaně</Badge>
+                )}
+                <span className="text-slate-600">
+                  {inv.multiUse ? "skupinový odkaz (WhatsApp)" : inv.email ?? "odkaz (bez e-mailu)"}
+                </span>
                 <div className="ml-auto flex gap-1">
                   <Button variant="ghost" size="sm" onClick={() => copyInvite(inv.token)}>
                     <Copy className="size-4" /> Kopírovat odkaz

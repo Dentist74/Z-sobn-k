@@ -79,6 +79,25 @@ export async function createInvite(role: string, email?: string): Promise<Invite
   return { ok: true, token };
 }
 
+// Skupinový odkaz: opakovaně použitelný (neomezený počet registrací), role Běžný uživatel, platí 7 dní.
+// Ideální do WhatsApp skupiny — každý si přes něj založí vlastní účet.
+const GROUP_INVITE_DAYS = 7;
+export async function createGroupInvite(): Promise<InviteResult> {
+  const actor = await requireRole("MANAGER");
+  const token = randomBytes(24).toString("hex");
+  await db.invitation.create({
+    data: {
+      token,
+      role: "STAFF",
+      multiUse: true,
+      createdById: actor.id,
+      expiresAt: new Date(Date.now() + GROUP_INVITE_DAYS * 24 * 60 * 60 * 1000),
+    },
+  });
+  revalidatePath("/nastaveni/uzivatele");
+  return { ok: true, token };
+}
+
 // Pošle pozvánku e-mailem (link sestaví klient z aktuální adresy).
 export async function sendInviteEmail(token: string, link: string): Promise<InviteResult> {
   await requireRole("MANAGER");
@@ -126,7 +145,7 @@ export async function acceptInvite(_prev: FormState, formData: FormData): Promis
   const d = parsed.data;
 
   const inv = await db.invitation.findUnique({ where: { token: d.token } });
-  if (!inv || inv.acceptedAt || inv.expiresAt < new Date()) {
+  if (!inv || inv.expiresAt < new Date() || (!inv.multiUse && inv.acceptedAt)) {
     return { error: "Pozvánka je neplatná nebo vypršela." };
   }
   const email = (inv.email || d.email).toLowerCase();
@@ -142,7 +161,10 @@ export async function acceptInvite(_prev: FormState, formData: FormData): Promis
       role: inv.role,
     },
   });
-  await db.invitation.update({ where: { id: inv.id }, data: { acceptedAt: new Date() } });
+  // Jednorázovou pozvánku spotřebujeme; skupinový (multiUse) odkaz zůstává dál platný.
+  if (!inv.multiUse) {
+    await db.invitation.update({ where: { id: inv.id }, data: { acceptedAt: new Date() } });
+  }
   await createSession(user.id);
   redirect("/dashboard");
 }
