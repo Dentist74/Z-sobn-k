@@ -359,21 +359,33 @@ export async function updateProductQuick(
     piecesPerPackage: number;
     packageLabel: string | null;
     trackLevels?: boolean;
+    // Přepíše novou cenou za kus i ceny naskladněných šarží (oprava špatně
+    // importovaných cen — hodnota skladu se jinak dál počítá ze staré ceny šarže).
+    applyPriceToBatches?: boolean;
   },
 ): Promise<ProductActionResult> {
   await requireRole("MANAGER");
   const num = (v: number) => (Number.isFinite(v) && v >= 0 ? v : 0);
-  await db.product.update({
-    where: { id },
-    data: {
-      minQuantity: num(data.minQuantity),
-      optimalQuantity: num(data.optimalQuantity),
-      pricePurchase: num(data.pricePurchase),
-      piecesPerPackage: data.piecesPerPackage > 0 ? data.piecesPerPackage : 1,
-      packageLabel: data.piecesPerPackage > 1 ? (data.packageLabel || "balení") : null,
-      ...(data.trackLevels !== undefined ? { trackLevels: data.trackLevels } : {}),
-      needsReview: false,
-    },
+  const unitPrice = num(data.pricePurchase);
+  await db.$transaction(async (tx) => {
+    await tx.product.update({
+      where: { id },
+      data: {
+        minQuantity: num(data.minQuantity),
+        optimalQuantity: num(data.optimalQuantity),
+        pricePurchase: unitPrice,
+        piecesPerPackage: data.piecesPerPackage > 0 ? data.piecesPerPackage : 1,
+        packageLabel: data.piecesPerPackage > 1 ? (data.packageLabel || "balení") : null,
+        ...(data.trackLevels !== undefined ? { trackLevels: data.trackLevels } : {}),
+        needsReview: false,
+      },
+    });
+    if (data.applyPriceToBatches) {
+      await tx.stockBatch.updateMany({
+        where: { productId: id },
+        data: { pricePurchase: unitPrice },
+      });
+    }
   });
   revalidatePath("/produkty");
   revalidatePath(`/produkty/${id}`);

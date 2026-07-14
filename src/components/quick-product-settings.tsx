@@ -47,6 +47,9 @@ export function QuickProductSettings({
     String(packagedInit ? round2(defaults.pricePurchase * defaults.piecesPerPackage) : defaults.pricePurchase),
   );
 
+  // Přepsat novou cenou i ceny šarží skladem (oprava špatných cen z importu).
+  const [applyToBatches, setApplyToBatches] = useState(false);
+
   const pp = packaged && Number(ppp) > 0 ? Number(ppp) : 1;
   const perPiece = priceMode === "package" ? (Number(price) || 0) / pp : Number(price) || 0;
 
@@ -58,6 +61,9 @@ export function QuickProductSettings({
     setPackaged(on);
     setPriceMode(on ? "package" : "piece");
     setPrice(String(round2(on ? unit * k : unit)));
+    // Zapnutí balení u dosud nebalené položky = nejspíš oprava importu →
+    // rovnou nabídni přepsání cen šarží (jde odškrtnout).
+    if (on && !packagedInit) setApplyToBatches(true);
   }
 
   function save() {
@@ -69,6 +75,7 @@ export function QuickProductSettings({
         piecesPerPackage: pp,
         packageLabel: packaged ? pkgLabel : null,
         trackLevels,
+        applyPriceToBatches: applyToBatches,
       });
       if (!res.ok) {
         toast.error(res.error ?? "Uložení selhalo.");
@@ -109,6 +116,11 @@ export function QuickProductSettings({
               = {perPiece.toLocaleString("cs-CZ", { maximumFractionDigits: 2 })} Kč/{unitLabel}
             </p>
           )}
+          <label className="flex items-start gap-1.5 text-xs text-slate-600">
+            <input type="checkbox" className="mt-0.5 size-3.5" checked={applyToBatches}
+              onChange={(e) => setApplyToBatches(e.target.checked)} />
+            Přepsat touto cenou i zásoby skladem (opraví hodnotu skladu)
+          </label>
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Balení</Label>
