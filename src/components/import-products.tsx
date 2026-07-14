@@ -31,6 +31,7 @@ export function ImportProducts({
   const [skip, setSkip] = useState<Set<number>>(new Set()); // indexy, které NEimportovat
 
   const [importPrice, setImportPrice] = useState(true);
+  const [pricePerPackage, setPricePerPackage] = useState(true);
   const [importVat, setImportVat] = useState(true);
   const [importStock, setImportStock] = useState(true);
   const [warehouseId, setWarehouseId] = useState(warehouses[0]?.id ?? "");
@@ -63,7 +64,7 @@ export function ImportProducts({
     const chosen = records.filter((_, i) => !skip.has(i));
     if (chosen.length === 0) { toast.error("Není vybrána žádná položka."); return; }
     start(async () => {
-      const res = await runImport(chosen, { importStock, importPrice, importVat, warehouseId });
+      const res = await runImport(chosen, { importStock, importPrice, importVat, pricePerPackage, warehouseId });
       if (!res.ok) {
         toast.error(res.error ?? "Import selhal.");
         return;
@@ -152,6 +153,13 @@ export function ImportProducts({
             onChange={(e) => setImportPrice(e.target.checked)} />
           Nákupní ceny (bez DPH)
         </label>
+        {importPrice && (
+          <label className="flex items-center gap-2 pl-6 text-sm">
+            <input type="checkbox" className="size-4" checked={pricePerPackage}
+              onChange={(e) => setPricePerPackage(e.target.checked)} />
+            Ceny jsou uvedené za balení → přepočítat na kus (např. 595/bal ÷ 5 = 119/ks)
+          </label>
+        )}
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" className="size-4" checked={importVat}
             onChange={(e) => setImportVat(e.target.checked)} />

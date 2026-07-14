@@ -64,6 +64,7 @@ export async function runImport(
     importStock: boolean;
     importPrice: boolean;
     importVat: boolean;
+    pricePerPackage: boolean; // cena v souboru je za balení → přepočítat na kus
     warehouseId: string;
   },
 ): Promise<ImportRunResult> {
@@ -74,6 +75,12 @@ export async function runImport(
   if (options.importStock && !options.warehouseId) {
     return { ok: false, error: "Pro import zásob vyber sklad." };
   }
+
+  // Cena za kus: u balení (víc ks) se cena z Evidentistu (za balení) vydělí počtem ks.
+  const unitPrice = (rec: ImportRecord) =>
+    options.pricePerPackage && rec.piecesPerPackage > 1
+      ? Math.round((rec.priceExclVat / rec.piecesPerPackage) * 100) / 100
+      : rec.priceExclVat;
 
   // dodavatelé: cache názvů → id (vytvoř chybějící)
   const suppliers = await db.supplier.findMany({ select: { id: true, name: true } });
@@ -150,7 +157,7 @@ export async function runImport(
           defaultSupplierId: supplierId,
           piecesPerPackage: rec.piecesPerPackage,
           packageLabel: rec.packaged ? "balení" : null,
-          ...(options.importPrice ? { pricePurchase: rec.priceExclVat } : {}),
+          ...(options.importPrice ? { pricePurchase: unitPrice(rec) } : {}),
           ...(options.importVat ? { vatRate: rec.vatRate } : {}),
         },
       });
@@ -168,7 +175,7 @@ export async function runImport(
           unit: "PCS",
           piecesPerPackage: rec.piecesPerPackage,
           packageLabel: rec.packaged ? "balení" : null,
-          pricePurchase: options.importPrice ? rec.priceExclVat : 0,
+          pricePurchase: options.importPrice ? unitPrice(rec) : 0,
           vatRate: options.importVat ? rec.vatRate : 21,
         },
         select: { id: true },
@@ -200,7 +207,7 @@ export async function runImport(
             warehouseId: options.warehouseId,
             supplierId,
             quantity: rec.stockQty,
-            pricePurchase: options.importPrice ? rec.priceExclVat : null,
+            pricePurchase: options.importPrice ? unitPrice(rec) : null,
           },
         });
         await db.stockMovement.create({

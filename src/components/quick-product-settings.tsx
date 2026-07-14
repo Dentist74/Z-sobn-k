@@ -31,17 +31,34 @@ export function QuickProductSettings({
   const router = useRouter();
   const [pending, start] = useTransition();
 
+  const round2 = (x: number) => Math.round(x * 100) / 100;
+  const packagedInit = defaults.piecesPerPackage > 1;
+
   const [min, setMin] = useState(String(defaults.minQuantity));
   const [opt, setOpt] = useState(String(defaults.optimalQuantity));
   const [trackLevels, setTrackLevels] = useState(defaults.trackLevels ?? true);
-  const [packaged, setPackaged] = useState(defaults.piecesPerPackage > 1);
+  const [packaged, setPackaged] = useState(packagedInit);
   const [ppp, setPpp] = useState(String(defaults.piecesPerPackage || 1));
   const [pkgLabel, setPkgLabel] = useState(defaults.packageLabel ?? "balení");
-  const [priceMode, setPriceMode] = useState<"piece" | "package">("piece");
-  const [price, setPrice] = useState(String(defaults.pricePurchase));
+  // U balení kartu otevřeme rovnou v režimu „za balení" a ukážeme cenu za balení
+  // (v DB se drží cena za kus). Bez toho karta po znovuotevření vždy zobrazila /ks.
+  const [priceMode, setPriceMode] = useState<"piece" | "package">(packagedInit ? "package" : "piece");
+  const [price, setPrice] = useState(
+    String(packagedInit ? round2(defaults.pricePurchase * defaults.piecesPerPackage) : defaults.pricePurchase),
+  );
 
   const pp = packaged && Number(ppp) > 0 ? Number(ppp) : 1;
   const perPiece = priceMode === "package" ? (Number(price) || 0) / pp : Number(price) || 0;
+
+  // Přepnutí „po baleních" zachová skutečnou cenu za kus a jen přepočítá zobrazení.
+  function togglePackaged(on: boolean) {
+    const k = Number(ppp) > 0 ? Number(ppp) : 1;
+    const cur = Number(price) || 0;
+    const unit = priceMode === "package" ? cur / k : cur;
+    setPackaged(on);
+    setPriceMode(on ? "package" : "piece");
+    setPrice(String(round2(on ? unit * k : unit)));
+  }
 
   function save() {
     start(async () => {
@@ -97,7 +114,7 @@ export function QuickProductSettings({
           <Label className="text-xs">Balení</Label>
           <label className="flex h-9 items-center gap-2 text-sm">
             <input type="checkbox" className="size-4" checked={packaged}
-              onChange={(e) => setPackaged(e.target.checked)} />
+              onChange={(e) => togglePackaged(e.target.checked)} />
             po baleních
           </label>
         </div>

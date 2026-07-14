@@ -117,15 +117,30 @@ export function ProductForm({
   }
   const packSuggestion = guessPack(nameVal);
 
+  const round2 = (x: number) => Math.round(x * 100) / 100;
+  const pkgInit = (dv.piecesPerPackage ?? 1) > 1;
   // balení (Ano/Ne) + počet ks v balení
-  const [packaged, setPackaged] = useState((dv.piecesPerPackage ?? 1) > 1);
-  // balení + cena
+  const [packaged, setPackaged] = useState(pkgInit);
+  // balení + cena — u balení otevřít v režimu „za balení" a ukázat cenu za balení
+  // (v DB je vždy cena za kus). Bez toho karta po znovuotevření vždy ukázala /ks.
   const [pcsPerPkg, setPcsPerPkg] = useState(String(dv.piecesPerPackage ?? 1));
-  const [priceMode, setPriceMode] = useState<"piece" | "package">("piece");
-  const [priceInput, setPriceInput] = useState(String(dv.pricePurchase ?? 0));
+  const [priceMode, setPriceMode] = useState<"piece" | "package">(pkgInit ? "package" : "piece");
+  const [priceInput, setPriceInput] = useState(
+    String(pkgInit ? round2((dv.pricePurchase ?? 0) * (dv.piecesPerPackage ?? 1)) : dv.pricePurchase ?? 0),
+  );
   const ppp = packaged && Number(pcsPerPkg) > 0 ? Number(pcsPerPkg) : 1;
   const perPiecePrice =
     priceMode === "package" ? (Number(priceInput) || 0) / ppp : Number(priceInput) || 0;
+
+  // Přepnutí „po baleních" zachová skutečnou cenu za kus a jen přepočítá zobrazení.
+  function togglePackaged(on: boolean) {
+    const k = Number(pcsPerPkg) > 0 ? Number(pcsPerPkg) : 1;
+    const cur = Number(priceInput) || 0;
+    const unit = priceMode === "package" ? cur / k : cur;
+    setPackaged(on);
+    setPriceMode(on ? "package" : "piece");
+    setPriceInput(String(round2(on ? unit * k : unit)));
+  }
   const baseUnitLabel = UNIT_LABELS[(dv.unit ?? "PCS") as keyof typeof UNIT_LABELS] ?? "ks";
 
   // sledování hladin min/opt (lze vypnout → nepřipomíná se k doplnění)
@@ -216,7 +231,7 @@ export function ProductForm({
           <input type="hidden" name="piecesPerPackage" value={packaged ? pcsPerPkg : "1"} />
           <label className="flex items-center gap-2 text-sm font-medium">
             <input type="checkbox" className="size-4" checked={packaged}
-              onChange={(e) => setPackaged(e.target.checked)} />
+              onChange={(e) => togglePackaged(e.target.checked)} />
             Kupuje se po balení (krabice) — výdej dál po kusech
           </label>
           {!packaged && packSuggestion > 1 && (
