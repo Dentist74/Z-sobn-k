@@ -227,7 +227,7 @@ export function MobileReceive({
             </label>
             <label className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-[#103D63] bg-white text-base font-semibold text-[#103D63] active:scale-[0.98]">
               {/* bez capture → galerie / soubory */}
-              🖼️ Z galerie
+              Vybrat soubor
               <input type="file" accept="image/*" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) onPhotoFile(f); e.target.value = ""; }} />
             </label>

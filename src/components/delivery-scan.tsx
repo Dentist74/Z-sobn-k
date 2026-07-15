@@ -221,7 +221,7 @@ export function DeliveryScan({
               <input type="file" accept="image/*" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
               <span className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border-2 border-[#103D63] bg-white text-base font-semibold text-[#103D63] active:scale-[0.98]">
-                🖼️ Z galerie
+                Vybrat soubor
               </span>
             </label>
           </div>
