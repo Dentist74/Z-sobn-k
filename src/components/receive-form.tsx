@@ -398,7 +398,8 @@ export function ReceiveForm({
         <div className="space-y-1.5">
           <Label>Faktura / doklad (fotka)</Label>
           <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-500 hover:bg-slate-50">
-            <input type="file" accept="image/*" capture="environment" className="hidden"
+            {/* bez capture → tablet nabídne foťák i galerii/soubory */}
+            <input type="file" accept="image/*" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) onInvoiceFile(f); e.target.value = ""; }} />
             {attachment ? `📎 ${attachment.name}` : "Vyfotit / vybrat fakturu (volitelné)"}
           </label>

@@ -207,19 +207,33 @@ export function DeliveryScan({
           <ScanLine className="size-4" />
           Načíst z dodacího listu (AI)
         </div>
-        <label className={mobile ? "w-full cursor-pointer" : "cursor-pointer"}>
-          <input type="file" accept="image/*" capture="environment" className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
-          {mobile ? (
-            <span className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#103D63] text-base font-semibold text-white active:scale-[0.98]">
-              <Camera className="size-5" /> {pending ? "Pracuji…" : "Vyfotit"}
-            </span>
-          ) : (
+        {mobile ? (
+          <div className="grid w-full grid-cols-2 gap-2">
+            <label className="cursor-pointer">
+              <input type="file" accept="image/*" capture="environment" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
+              <span className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#103D63] text-base font-semibold text-white active:scale-[0.98]">
+                <Camera className="size-5" /> {pending ? "Pracuji…" : "Vyfotit"}
+              </span>
+            </label>
+            <label className="cursor-pointer">
+              {/* bez capture → otevře galerii / výběr souboru */}
+              <input type="file" accept="image/*" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
+              <span className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border-2 border-[#103D63] bg-white text-base font-semibold text-[#103D63] active:scale-[0.98]">
+                🖼️ Z galerie
+              </span>
+            </label>
+          </div>
+        ) : (
+          <label className="cursor-pointer">
+            <input type="file" accept="image/*" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
             <span className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-50">
               {pending ? "Pracuji…" : "Vybrat / vyfotit"}
             </span>
-          )}
-        </label>
+          </label>
+        )}
       </div>
 
       {preview && (

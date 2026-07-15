@@ -3,7 +3,28 @@
 import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import type { IScannerControls } from "@zxing/browser";
+import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import { Camera, X } from "lucide-react";
+
+// Čárové kódy + QR + DataMatrix (bývá na dentálním materiálu), TRY_HARDER
+// výrazně zlepší čtení menších/hůř nasvícených kódů z mobilu.
+const SCAN_HINTS = new Map<DecodeHintType, unknown>([
+  [
+    DecodeHintType.POSSIBLE_FORMATS,
+    [
+      BarcodeFormat.QR_CODE,
+      BarcodeFormat.DATA_MATRIX,
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.CODE_128,
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E,
+      BarcodeFormat.ITF,
+    ],
+  ],
+  [DecodeHintType.TRY_HARDER, true],
+]);
 
 // Tlačítko, které otevře fotoaparát a naskenuje čárový/QR kód (Android i iOS).
 // Vyžaduje HTTPS (nebo localhost) — jinak prohlížeč kameru nepustí.
@@ -25,7 +46,7 @@ export function CameraScanButton({
     if (!open) return;
     let stopped = false;
     setError(null);
-    const reader = new BrowserMultiFormatReader();
+    const reader = new BrowserMultiFormatReader(SCAN_HINTS);
     reader
       .decodeFromConstraints(
         { video: { facingMode: "environment" } },

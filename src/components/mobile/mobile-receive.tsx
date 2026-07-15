@@ -219,11 +219,19 @@ export function MobileReceive({
             </button>
           </div>
         ) : (
-          <label className="flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#103D63] text-base font-semibold text-white active:scale-[0.98]">
-            <Camera className="size-5" /> Fotoaparát
-            <input type="file" accept="image/*" capture="environment" className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) onPhotoFile(f); e.target.value = ""; }} />
-          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#103D63] text-base font-semibold text-white active:scale-[0.98]">
+              <Camera className="size-5" /> Fotoaparát
+              <input type="file" accept="image/*" capture="environment" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) onPhotoFile(f); e.target.value = ""; }} />
+            </label>
+            <label className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-[#103D63] bg-white text-base font-semibold text-[#103D63] active:scale-[0.98]">
+              {/* bez capture → galerie / soubory */}
+              🖼️ Z galerie
+              <input type="file" accept="image/*" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) onPhotoFile(f); e.target.value = ""; }} />
+            </label>
+          </div>
         )}
       </div>
 
