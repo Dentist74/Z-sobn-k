@@ -106,8 +106,18 @@ export function ProductPicker({
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder="Hledat položku nebo naskenovat čárový kód…"
-          className="pl-9"
+          className="pl-9 pr-9"
         />
+        {q && (
+          <button
+            type="button"
+            aria-label="Smazat hledání"
+            onClick={() => setQ("")}
+            className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-full bg-slate-200 text-slate-500 hover:bg-slate-300 hover:text-slate-700"
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
         {filtered.length > 0 && (
           <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-md border bg-white shadow-md">
           {filtered.map((p) => (

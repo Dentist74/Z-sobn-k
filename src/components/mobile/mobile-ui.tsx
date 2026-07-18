@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, Minus, Plus } from "lucide-react";
+import { Search, Minus, Plus, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { CameraScanButton } from "@/components/camera-scan-button";
 
@@ -64,8 +64,18 @@ export function MobileItemSearch({
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={placeholder}
-          className="h-12 pl-10 text-base"
+          className="h-12 pl-10 pr-11 text-base"
         />
+        {q && (
+          <button
+            type="button"
+            aria-label="Smazat hledání"
+            onClick={() => setQ("")}
+            className="absolute right-2 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-slate-200 text-slate-600 active:scale-90"
+          >
+            <X className="size-4.5" />
+          </button>
+        )}
       </div>
       <CameraScanButton
         onScan={onScan}
