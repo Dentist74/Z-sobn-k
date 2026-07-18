@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Search, Minus, Plus, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { CameraScanButton } from "@/components/camera-scan-button";
@@ -27,6 +27,7 @@ export function MobileItemSearch({
   placeholder?: string;
 }) {
   const [q, setQ] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const results = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -44,6 +45,8 @@ export function MobileItemSearch({
   function pick(p: MobileProduct) {
     setQ("");
     onPick(p);
+    // Kurzor zpět do hledání — další kód jde načíst čtečkou hned bez ťukání.
+    requestAnimationFrame(() => inputRef.current?.focus());
   }
 
   // Sken: přesná shoda kódu/SKU → rovnou vybrat, jinak předvyplnit hledání.
@@ -61,6 +64,7 @@ export function MobileItemSearch({
       <div className="relative">
         <Search className="absolute left-3 top-1/2 size-5 -translate-y-1/2 text-slate-400" />
         <Input
+          ref={inputRef}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder={placeholder}

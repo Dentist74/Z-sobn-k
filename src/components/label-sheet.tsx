@@ -85,10 +85,10 @@ export function LabelSheet({
       <div className="flex flex-wrap gap-3 px-4">
         {labels.map((_, i) => (
           <div key={i} className="label rounded border bg-white text-center">
-            <span className="text-[2.6mm] font-medium leading-tight line-clamp-2">{name}</span>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={img} alt={`Kód ${spec.text}`} />
             <span className="text-[2.4mm] tracking-wide">{spec.text}</span>
+            <span className="text-[2.6mm] font-medium leading-tight line-clamp-2">{name}</span>
           </div>
         ))}
       </div>

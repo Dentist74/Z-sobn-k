@@ -129,10 +129,10 @@ export function BulkLabels({ products }: { products: LabelItem[] }) {
           const img = barcodeUrl(p.spec, { scale: 4, height: 14, includetext: false });
           return (
             <div key={`${p.id}-${i}`} className="label rounded border bg-white text-center">
-              <span className="text-[2.6mm] font-medium leading-tight line-clamp-2">{p.name}</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={img} alt={`Kód ${p.spec.text}`} />
               <span className="text-[2.4mm] tracking-wide">{p.spec.text}</span>
+              <span className="text-[2.6mm] font-medium leading-tight line-clamp-2">{p.name}</span>
             </div>
           );
         })}
