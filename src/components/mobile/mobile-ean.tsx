@@ -46,6 +46,8 @@ export function MobileEan({ products }: { products: MobileProduct[] }) {
     start(async () => {
       const res = await assignGeneratedEan(selected.id);
       if (!res.ok || !res.code) { toast.error(res.error ?? "Generování selhalo."); return; }
+      // nový kód i do lokální kopie karty — v seznamu zůstanou vidět všechny
+      setSelected((p) => (p ? { ...p, codes: [...p.codes, res.code!] } : p));
       setNewCode(res.code);
       toast.success("EAN vygenerován a uložen na kartu.");
       router.refresh();
@@ -53,7 +55,11 @@ export function MobileEan({ products }: { products: MobileProduct[] }) {
   }
 
   if (selected) {
-    const eans = selected.codes.filter((c) => /^\d{8}$|^\d{13}$/.test(c));
+    // existující EANy karty + případně čerstvě vygenerovaný
+    const eans = [...new Set([
+      ...selected.codes.filter((c) => /^\d{8}$|^\d{13}$/.test(c)),
+      ...(newCode ? [newCode] : []),
+    ])];
     const shown = newCode ?? eans[0] ?? null;
     return (
       <div className="space-y-3">
@@ -66,24 +72,35 @@ export function MobileEan({ products }: { products: MobileProduct[] }) {
               <img src={barcodeUrl({ text: shown, bcid: "ean13" })} alt={shown}
                 className="mx-auto max-h-24" />
               <p className="font-mono text-sm text-slate-600">{shown}</p>
-              {!newCode && <p className="text-xs text-slate-400">Položka už čárový kód má.</p>}
+              {eans.length > 1 && (
+                <p className="text-xs text-slate-400">
+                  Všechny EANy karty: <span className="font-mono">{eans.join(" · ")}</span>
+                  <br />Naskenovat jde kterýkoliv z nich.
+                </p>
+              )}
             </div>
           ) : (
             <p className="text-sm text-slate-500">Položka zatím nemá žádný čárový kód.</p>
           )}
 
           <div className="space-y-2">
-            {!shown && (
+            {!shown ? (
               <button type="button" onClick={generate} disabled={pending}
                 className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#103D63] text-base font-semibold text-white disabled:opacity-50 active:scale-[0.98]">
                 <Barcode className="size-5" /> {pending ? "Generuji…" : "Vygenerovat EAN kód"}
               </button>
-            )}
-            {shown && (
-              <Link href={`/stitek/${selected.id}`} target="_blank"
-                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-base font-semibold text-white active:scale-[0.98]">
-                <Printer className="size-5" /> Vytisknout štítek
-              </Link>
+            ) : (
+              <>
+                <Link href={`/stitek/${selected.id}`} target="_blank"
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-base font-semibold text-white active:scale-[0.98]">
+                  <Printer className="size-5" /> Vytisknout štítek
+                </Link>
+                {/* další EAN téže karty — např. jiný kód na krabici a na kusu */}
+                <button type="button" onClick={generate} disabled={pending}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border-2 border-[#103D63] bg-white text-base font-semibold text-[#103D63] disabled:opacity-50 active:scale-[0.98]">
+                  <Barcode className="size-5" /> {pending ? "Generuji…" : "Vygenerovat další EAN"}
+                </button>
+              </>
             )}
           </div>
         </div>
