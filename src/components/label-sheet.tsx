@@ -18,17 +18,21 @@ type SizeKey = keyof typeof SIZES;
 export function LabelSheet({
   name,
   sku,
-  spec,
+  specs,
+  initialIndex = 0,
   backHref,
 }: {
   name: string;
   sku: string;
-  spec: BarcodeSpec;
+  specs: BarcodeSpec[]; // všechny kódy karty — na štítek jde vybrat kterýkoliv
+  initialIndex?: number;
   backHref: string;
 }) {
   const [count, setCount] = useState(1);
   const [size, setSize] = useState<SizeKey>("50x30");
+  const [specIdx, setSpecIdx] = useState(Math.min(initialIndex, specs.length - 1));
   const dim = SIZES[size];
+  const spec = specs[specIdx] ?? specs[0];
 
   // vyšší scale pro ostrý tisk
   const img = barcodeUrl(spec, { scale: 4, height: 14, includetext: false });
@@ -70,6 +74,19 @@ export function LabelSheet({
             ))}
           </select>
         </div>
+        {specs.length > 1 && (
+          <div className="space-y-1.5">
+            <Label htmlFor="specIdx">Kód na štítku</Label>
+            <select id="specIdx" value={specIdx} onChange={(e) => setSpecIdx(Number(e.target.value))}
+              className="border-input flex h-9 w-48 rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs">
+              {specs.map((s, i) => (
+                <option key={s.text} value={i}>
+                  {s.text}{s.text === sku ? " (M-kód)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <Button onClick={() => window.print()}>
           <Printer className="size-4" /> Tisk
         </Button>

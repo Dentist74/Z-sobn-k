@@ -38,6 +38,14 @@ export function barcodeForProduct(p: {
   return { text: p.sku, bcid: "code128" };
 }
 
+// Spec pro KONKRÉTNÍ kód (výběr kódu při tisku štítku).
+export function specForCode(code: string): BarcodeSpec {
+  const digits = code.replace(/\s/g, "");
+  if (/^\d{13}$/.test(digits) && eanChecksumOk(digits)) return { text: digits, bcid: "ean13" };
+  if (/^\d{8}$/.test(digits) && eanChecksumOk(digits)) return { text: digits, bcid: "ean8" };
+  return { text: code, bcid: "code128" };
+}
+
 export function barcodeUrl(
   spec: BarcodeSpec,
   opts?: { scale?: number; height?: number; includetext?: boolean },

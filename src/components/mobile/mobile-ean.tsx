@@ -4,10 +4,11 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Barcode, Printer, RotateCcw, Plus } from "lucide-react";
+import { Barcode, Printer, RotateCcw, Plus, Link2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { assignGeneratedEan, createProductForEan } from "@/app/actions/products";
-import { barcodeUrl } from "@/lib/barcode";
+import { assignGeneratedEan, assignEanCode, createProductForEan } from "@/app/actions/products";
+import { barcodeUrl, specForCode } from "@/lib/barcode";
+import { CameraScanButton } from "@/components/camera-scan-button";
 import { MobileItemSearch, type MobileProduct } from "@/components/mobile/mobile-ui";
 
 // Přidělení EAN: najdi položku → vygeneruj interní EAN-13 → vytiskni štítek.
@@ -18,6 +19,23 @@ export function MobileEan({ products }: { products: MobileProduct[] }) {
   const [newCode, setNewCode] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
+  // ruční/naskenovaný kód k přiřazení na kartu (např. EAN druhé varianty)
+  const [manualCode, setManualCode] = useState("");
+
+  function assignManual() {
+    if (!selected) return;
+    const code = manualCode.trim();
+    if (!code) { toast.error("Naskenuj nebo zadej kód."); return; }
+    start(async () => {
+      const res = await assignEanCode(selected.id, code);
+      if (!res.ok || !res.code) { toast.error(res.error ?? "Přiřazení selhalo."); return; }
+      setSelected((p) => (p ? { ...p, codes: [...p.codes, res.code!] } : p));
+      setNewCode(res.code);
+      setManualCode("");
+      toast.success("Kód přiřazen ke kartě.");
+      router.refresh();
+    });
+  }
 
   // Založí novou kartu přímo tady (zůstáváme v pracovním módu) a rovnou
   // jí vygeneruje EAN — detaily karty se doplní později ve správním módu.
@@ -69,7 +87,7 @@ export function MobileEan({ products }: { products: MobileProduct[] }) {
           {shown ? (
             <div className="space-y-2 text-center">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={barcodeUrl({ text: shown, bcid: "ean13" })} alt={shown}
+              <img src={barcodeUrl(specForCode(shown))} alt={shown}
                 className="mx-auto max-h-24" />
               <p className="font-mono text-sm text-slate-600">{shown}</p>
               {eans.length > 1 && (
@@ -91,7 +109,7 @@ export function MobileEan({ products }: { products: MobileProduct[] }) {
               </button>
             ) : (
               <>
-                <Link href={`/stitek/${selected.id}`} target="_blank"
+                <Link href={`/stitek/${selected.id}?code=${encodeURIComponent(shown)}`} target="_blank"
                   className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-base font-semibold text-white active:scale-[0.98]">
                   <Printer className="size-5" /> Vytisknout štítek
                 </Link>
@@ -102,6 +120,33 @@ export function MobileEan({ products }: { products: MobileProduct[] }) {
                 </button>
               </>
             )}
+          </div>
+
+          {/* Přiřazení existujícího (naskenovaného) kódu — např. EAN druhé varianty */}
+          <div className="space-y-2 rounded-xl border border-dashed border-slate-300 p-3">
+            <p className="flex items-center gap-1.5 text-sm font-medium text-slate-600">
+              <Link2 className="size-4" /> Přiřadit naskenovaný kód k této kartě
+            </p>
+            <Input
+              value={manualCode}
+              onChange={(e) => setManualCode(e.target.value)}
+              placeholder="Naskenuj nebo napiš EAN…"
+              className="h-11 text-base"
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <CameraScanButton
+                onScan={(code) => setManualCode(code)}
+                label="Naskenovat"
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#103D63] text-sm font-semibold text-white active:scale-[0.98]"
+              />
+              <button type="button" onClick={assignManual} disabled={pending || !manualCode.trim()}
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-sm font-semibold text-white disabled:opacity-40 active:scale-[0.98]">
+                {pending ? "Ukládám…" : "Přiřadit kód"}
+              </button>
+            </div>
+            <p className="text-xs text-slate-400">
+              Hodí se, když má produkt víc variant balení — naskenuj kód varianty a karta ho pak pozná.
+            </p>
           </div>
         </div>
 

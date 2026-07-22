@@ -377,6 +377,37 @@ export async function createProductForEan(
   return { ok: true, id: p.id, sku: p.sku };
 }
 
+// Přiřadí kartě KONKRÉTNÍ (naskenovaný/zadaný) čárový kód — např. EAN druhé
+// varianty produktu, která v systému ještě není. Hlídá kolize s jinými kartami.
+export async function assignEanCode(
+  productId: string,
+  code: string,
+): Promise<{ ok: boolean; code?: string; error?: string }> {
+  await requireRole("MANAGER");
+  const clean = (code ?? "").trim();
+  if (clean.length < 4) return { ok: false, error: "Kód je moc krátký — naskenuj/zadej celý čárový kód." };
+  if (/^https?:/i.test(clean)) return { ok: false, error: "Tohle vypadá jako webová adresa, ne čárový kód." };
+
+  const product = await db.product.findUnique({ where: { id: productId }, select: { id: true } });
+  if (!product) return { ok: false, error: "Položka nenalezena." };
+
+  const existing = await db.productBarcode.findFirst({
+    where: { code: clean },
+    select: { productId: true, product: { select: { name: true } } },
+  });
+  if (existing) {
+    if (existing.productId === productId) {
+      return { ok: false, error: "Tento kód už na kartě je." };
+    }
+    return { ok: false, error: `Kód už patří jiné kartě: „${existing.product.name}".` };
+  }
+
+  await db.productBarcode.create({ data: { productId, code: clean } });
+  revalidatePath("/produkty");
+  revalidatePath(`/produkty/${productId}`);
+  return { ok: true, code: clean };
+}
+
 // Vygeneruje položce interní EAN-13 (prefix 299 = vnitřní použití) a uloží ho.
 // Vrací kód pro zobrazení/tisk štítku.
 export async function assignGeneratedEan(
