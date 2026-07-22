@@ -178,13 +178,19 @@ export function ReceiveForm({
         packageLabel: null,
         defaultWarehouseId: null,
       };
+    // Balené zboží: doklad uvádí počet BALENÍ a cenu za balení → přepočet
+    // na kusy (sklad i ceny se vedou za kus). Jinak by se 2 bal = 160 ks
+    // naskladnily jako 2 ks.
+    const k = product.piecesPerPackage > 1 ? product.piecesPerPackage : 1;
     setItems((prev) => [
       ...prev,
       {
         key: `${product.id}-${prev.length}-scan`,
         product,
-        quantity: String(p.quantity),
-        pricePurchase: p.unitPrice != null ? String(p.unitPrice) : "",
+        quantity: String(p.quantity * k),
+        pricePurchase: p.unitPrice != null
+          ? String(Math.round((p.unitPrice / k) * 100) / 100)
+          : "",
         supplierId: "",
         lotNumber: "",
         expiryDate: "",

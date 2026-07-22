@@ -22,6 +22,7 @@ export default async function MobileReceivePage() {
       select: {
         id: true, name: true, sku: true, unit: true,
         manufacturerCode: true, distributorCode: true,
+        piecesPerPackage: true, packageLabel: true,
         barcodes: { select: { code: true } },
         batches: { where: { quantity: { gt: 0 } }, select: { quantity: true } },
       },
@@ -36,6 +37,8 @@ export default async function MobileReceivePage() {
     name: p.name,
     sku: p.sku,
     unit: p.unit,
+    piecesPerPackage: toNumber(p.piecesPerPackage),
+    packageLabel: p.packageLabel,
     codes: [
       ...p.barcodes.map((b) => b.code),
       ...(p.manufacturerCode ? [p.manufacturerCode] : []),

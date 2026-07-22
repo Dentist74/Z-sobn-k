@@ -61,10 +61,10 @@ export function DeliveryScan({
   const [matchingIdx, setMatchingIdx] = useState<number | null>(null);
   // řádky už přidané do příjemky — zmizí z nabídky „Z dokladu"
   const [addedIdx, setAddedIdx] = useState<Set<number>>(new Set());
-  // náhled vyfocené/vybrané faktury před odesláním do AI
-  const [preview, setPreview] = useState<
-    { dataUrl: string; base64: string; mediaType: (typeof ALLOWED)[number] } | null
-  >(null);
+  // náhledy vyfocených/vybraných dokladů před odesláním do AI (může jich být víc)
+  const [previews, setPreviews] = useState<
+    { dataUrl: string; base64: string; mediaType: (typeof ALLOWED)[number] }[]
+  >([]);
 
   function patchRow(i: number, patch: Partial<ScannedItem>) {
     setRows((prev) =>
@@ -72,37 +72,52 @@ export function DeliveryScan({
     );
   }
 
-  // 1) vyber/vyfoť → ukáže náhled (nic se ještě neposílá do AI)
-  async function handleFile(file: File) {
-    if (!file.type.startsWith("image/")) {
-      toast.error("Nahraj fotku (JPG/PNG). PDF zatím vyfoť jako obrázek.");
-      return;
-    }
-    try {
-      // zmenšení v telefonu → menší přenos, rychlejší a levnější AI
-      const { dataUrl, base64 } = await compressImage(file);
-      setPreview({ dataUrl, base64, mediaType: "image/jpeg" });
-    } catch {
-      toast.error("Obrázek se nepodařilo zpracovat. Zkus to znovu.");
+  // 1) vyber/vyfoť (klidně víc souborů najednou) → přidá náhledy
+  //    (nic se ještě neposílá do AI)
+  async function handleFiles(files: FileList | File[]) {
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith("image/")) {
+        toast.error(`„${file.name}" není obrázek (JPG/PNG). PDF zatím vyfoť jako obrázek.`);
+        continue;
+      }
+      try {
+        // zmenšení v telefonu → menší přenos, rychlejší a levnější AI
+        const { dataUrl, base64 } = await compressImage(file);
+        setPreviews((prev) => [...prev, { dataUrl, base64, mediaType: "image/jpeg" }]);
+      } catch {
+        toast.error("Obrázek se nepodařilo zpracovat. Zkus to znovu.");
+      }
     }
   }
 
-  // 2) potvrzení náhledu → teprve teď rozpoznání přes AI
+  // 2) potvrzení náhledů → rozpoznání přes AI (postupně všechny doklady).
+  //    Nové položky se PŘIDAJÍ k už načteným — nic se nemaže.
   function runScan() {
-    if (!preview) return;
-    const { base64, mediaType } = preview;
+    if (previews.length === 0) return;
+    const batch = [...previews];
     start(async () => {
-      const res = await scanDeliveryNote({ imageBase64: base64, mediaType });
-      if (!res.ok) {
-        toast.error(res.error ?? "Sken selhal.");
+      const newItems: ScannedItem[] = [];
+      let newSupplier: string | null = null;
+      let failed = 0;
+      for (const p of batch) {
+        const res = await scanDeliveryNote({ imageBase64: p.base64, mediaType: p.mediaType });
+        if (!res.ok) { failed++; continue; }
+        newItems.push(...(res.items ?? []));
+        if (!newSupplier && res.supplierName) newSupplier = res.supplierName;
+      }
+      if (newItems.length === 0) {
+        toast.error("Z dokladů se nepodařilo nic přečíst. Zkus lepší fotku.");
         return;
       }
-      setRows(res.items ?? []);
-      setSupplier(res.supplierName ?? null);
+      // připojit za stávající řádky — indexy už přidaných se nemění
+      setRows((prev) => [...(prev ?? []), ...newItems]);
+      setSupplier((prev) => prev ?? newSupplier);
       setMatchingIdx(null);
-      setAddedIdx(new Set());
-      setPreview(null);
-      toast.success(`Načteno ${res.items?.length ?? 0} položek z dokladu.`);
+      setPreviews([]);
+      toast.success(
+        `Načteno ${newItems.length} položek z ${batch.length - failed} dokladů` +
+        (failed ? ` (${failed} se nepodařilo přečíst)` : "") + ".",
+      );
     });
   }
 
@@ -211,47 +226,63 @@ export function DeliveryScan({
           <div className="grid w-full grid-cols-2 gap-2">
             <label className="cursor-pointer">
               <input type="file" accept="image/*" capture="environment" className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
+                onChange={(e) => { if (e.target.files?.length) handleFiles(e.target.files); e.target.value = ""; }} />
               <span className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#103D63] text-base font-semibold text-white active:scale-[0.98]">
                 <Camera className="size-5" /> {pending ? "Pracuji…" : "Vyfotit"}
               </span>
             </label>
             <label className="cursor-pointer">
-              {/* bez capture → otevře galerii / výběr souboru */}
-              <input type="file" accept="image/*" className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
+              {/* bez capture → galerie / soubory; jde vybrat víc najednou */}
+              <input type="file" accept="image/*" multiple className="hidden"
+                onChange={(e) => { if (e.target.files?.length) handleFiles(e.target.files); e.target.value = ""; }} />
               <span className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border-2 border-[#103D63] bg-white text-base font-semibold text-[#103D63] active:scale-[0.98]">
-                Vybrat soubor
+                Vybrat soubory
               </span>
             </label>
           </div>
         ) : (
           <label className="cursor-pointer">
-            <input type="file" accept="image/*" className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
+            <input type="file" accept="image/*" multiple className="hidden"
+              onChange={(e) => { if (e.target.files?.length) handleFiles(e.target.files); e.target.value = ""; }} />
             <span className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-50">
-              {pending ? "Pracuji…" : "Vybrat / vyfotit"}
+              {pending ? "Pracuji…" : "Vybrat / vyfotit (i více souborů)"}
             </span>
           </label>
         )}
       </div>
 
-      {preview && (
+      {previews.length > 0 && (
         <div className="space-y-2 rounded-md border bg-slate-50 p-3">
-          <p className="text-sm font-medium text-slate-700">Je fotka v pořádku?</p>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={preview.dataUrl} alt="Náhled dokladu"
-            className="max-h-72 w-auto rounded border" />
+          <p className="text-sm font-medium text-slate-700">
+            {previews.length === 1 ? "Je fotka v pořádku?" : `Doklady k rozpoznání: ${previews.length}`}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {previews.map((p, i) => (
+              <div key={i} className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.dataUrl} alt={`Doklad ${i + 1}`}
+                  className="h-28 w-auto rounded border" />
+                <button type="button" aria-label="Odebrat"
+                  onClick={() => setPreviews((prev) => prev.filter((_, x) => x !== i))}
+                  className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-red-600 text-white">
+                  <X className="size-3" />
+                </button>
+              </div>
+            ))}
+          </div>
           <p className="text-xs text-slate-500">
-            Zkontroluj, že je čitelná a není rozmazaná. Pak spusť rozpoznání.
+            Zkontroluj čitelnost. Můžeš přidat další fotky/soubory — rozpoznají se všechny naráz
+            a položky se přidají k už načteným.
           </p>
           <div className="flex gap-2">
             <Button type="button" onClick={runScan} disabled={pending}>
-              {pending ? "Rozpoznávám…" : "Použít a rozpoznat"}
+              {pending
+                ? "Rozpoznávám…"
+                : previews.length === 1 ? "Použít a rozpoznat" : `Rozpoznat vše (${previews.length})`}
             </Button>
             <Button type="button" variant="outline" disabled={pending}
-              onClick={() => setPreview(null)}>
-              Vyfotit / vybrat znovu
+              onClick={() => setPreviews([])}>
+              Zrušit
             </Button>
           </div>
         </div>

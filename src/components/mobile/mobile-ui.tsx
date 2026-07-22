@@ -14,6 +14,8 @@ export type MobileProduct = {
   unit: string;
   totalQty?: number;
   byWh?: Record<string, number>; // stav po skladech (pro přeskladnění)
+  piecesPerPackage?: number; // >1 = kupuje se po balení (sklad se vede v ks)
+  packageLabel?: string | null;
 };
 
 // Velké vyhledávací pole + modré tlačítko Naskenovat + našeptávač.

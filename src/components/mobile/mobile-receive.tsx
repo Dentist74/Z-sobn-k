@@ -17,10 +17,16 @@ type Row = {
   key: string;
   product: MobileProduct;
   quantity: number;
+  // U balených položek se zadává v baleních a při naskladnění se přepočte
+  // na kusy (sklad se vede vždy v ks). "bal" jen pro piecesPerPackage > 1.
+  unit: "ks" | "bal";
   lotNumber: string;
   expiryDate: string;
-  pricePurchase: number | null; // z AI skenu (jinak null)
+  pricePurchase: number | null; // z AI skenu, za zadanou jednotku (jinak null)
 };
+
+const pppOf = (p: MobileProduct) =>
+  p.piecesPerPackage && p.piecesPerPackage > 1 ? p.piecesPerPackage : 1;
 
 export function MobileReceive({
   products,
@@ -49,7 +55,7 @@ export function MobileReceive({
       if (!raw) return;
       const d = JSON.parse(raw) as {
         warehouseId?: string;
-        rows?: { id: string; q: number; lot: string; exp: string; price: number | null }[];
+        rows?: { id: string; q: number; u?: string; lot: string; exp: string; price: number | null }[];
       };
       if (d.warehouseId && warehouses.some((w) => w.id === d.warehouseId)) {
         setWarehouseId(d.warehouseId);
@@ -62,6 +68,7 @@ export function MobileReceive({
             key: `${p.id}-${i}`,
             product: p,
             quantity: r.q > 0 ? r.q : 1,
+            unit: (r.u === "ks" || r.u === "bal" ? r.u : pppOf(p) > 1 ? "bal" : "ks") as Row["unit"],
             lotNumber: r.lot ?? "",
             expiryDate: r.exp ?? "",
             pricePurchase: r.price ?? null,
@@ -85,7 +92,7 @@ export function MobileReceive({
       localStorage.setItem(DRAFT_KEY, JSON.stringify({
         warehouseId,
         rows: rows.map((r) => ({
-          id: r.product.id, q: r.quantity, lot: r.lotNumber, exp: r.expiryDate, price: r.pricePurchase,
+          id: r.product.id, q: r.quantity, u: r.unit, lot: r.lotNumber, exp: r.expiryDate, price: r.pricePurchase,
         })),
       }));
     } catch {}
@@ -103,6 +110,8 @@ export function MobileReceive({
         key: `${p.id}-${prev.length}`,
         product: p,
         quantity: qty,
+        // balené zboží se přijímá po baleních (faktury ho tak i uvádějí)
+        unit: pppOf(p) > 1 ? "bal" : "ks",
         lotNumber: "",
         expiryDate: "",
         pricePurchase: price,
@@ -128,13 +137,19 @@ export function MobileReceive({
     start(async () => {
       const res = await receiveDocument({
         warehouseId,
-        items: rows.map((r) => ({
-          productId: r.product.id,
-          quantity: r.quantity,
-          lotNumber: r.lotNumber || null,
-          expiryDate: r.expiryDate || null,
-          pricePurchase: r.pricePurchase,
-        })),
+        items: rows.map((r) => {
+          // balení → kusy (sklad i ceny se vedou za kus)
+          const k = r.unit === "bal" ? pppOf(r.product) : 1;
+          return {
+            productId: r.product.id,
+            quantity: r.quantity * k,
+            lotNumber: r.lotNumber || null,
+            expiryDate: r.expiryDate || null,
+            pricePurchase: r.pricePurchase != null
+              ? Math.round((r.pricePurchase / k) * 100) / 100
+              : null,
+          };
+        }),
         attachment: photo ? { base64: photo.base64, name: photo.name, mediaType: photo.mediaType } : null,
       });
       if (!res.ok) { toast.error(res.error ?? "Naskladnění selhalo."); return; }
@@ -186,7 +201,27 @@ export function MobileReceive({
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <QtyStepper value={r.quantity} onChange={(n) => patchRow(r.key, { quantity: n })} />
-                <span className="text-sm text-slate-500">ks</span>
+                {pppOf(r.product) > 1 ? (
+                  <>
+                    <select
+                      value={r.unit}
+                      onChange={(e) => patchRow(r.key, { unit: e.target.value as Row["unit"] })}
+                      className="border-input h-9 rounded-lg border bg-white px-2 text-sm"
+                    >
+                      <option value="bal">
+                        {r.product.packageLabel || "balení"} ({pppOf(r.product)} ks)
+                      </option>
+                      <option value="ks">ks</option>
+                    </select>
+                    {r.unit === "bal" && (
+                      <span className="text-sm font-medium text-green-700">
+                        = {r.quantity * pppOf(r.product)} ks
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-sm text-slate-500">ks</span>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <label className="min-w-0 space-y-0.5">
