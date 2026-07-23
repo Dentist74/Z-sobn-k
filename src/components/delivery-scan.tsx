@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ScanLine, Plus, Check, X, FilePlus, Link2, RefreshCw, Camera } from "lucide-react";
+import { ScanLine, Plus, Check, X, FilePlus, Link2, RefreshCw, Camera, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -61,6 +61,8 @@ export function DeliveryScan({
   const [matchingIdx, setMatchingIdx] = useState<number | null>(null);
   // řádky už přidané do příjemky — zmizí z nabídky „Z dokladu"
   const [addedIdx, setAddedIdx] = useState<Set<number>>(new Set());
+  // řádky, které uživatel nechce přijmout (odebral je z načteného seznamu)
+  const [removedIdx, setRemovedIdx] = useState<Set<number>>(new Set());
   // náhledy vyfocených/vybraných dokladů před odesláním do AI (může jich být víc)
   const [previews, setPreviews] = useState<
     { dataUrl: string; base64: string; mediaType: (typeof ALLOWED)[number] }[]
@@ -210,9 +212,10 @@ export function DeliveryScan({
     setAddedIdx((prev) => new Set(prev).add(i));
   }
 
-  // počet napárovaných, které ještě nebyly přidány do příjemky
+  // počet napárovaných, které ještě nebyly přidány do příjemky (a nejsou odebrané)
   const pendingMatched =
-    rows?.map((it, i) => ({ it, i })).filter(({ it, i }) => it.productId && !addedIdx.has(i)) ?? [];
+    rows?.map((it, i) => ({ it, i }))
+      .filter(({ it, i }) => it.productId && !addedIdx.has(i) && !removedIdx.has(i)) ?? [];
   const matchedCount = pendingMatched.length;
 
   return (
@@ -310,7 +313,7 @@ export function DeliveryScan({
                   <TableRow><TableCell colSpan={5} className="text-center text-slate-500">Nic nenačteno.</TableCell></TableRow>
                 )}
                 {rows.map((it, i) => {
-                  if (addedIdx.has(i)) return null;
+                  if (addedIdx.has(i) || removedIdx.has(i)) return null;
                   return (
                   <TableRow key={i}>
                     <TableCell>
@@ -405,13 +408,20 @@ export function DeliveryScan({
                       )}
                     </TableCell>
                     <TableCell>
-                      {it.productId && (
-                        <button type="button" aria-label="Přidat do příjemky"
-                          onClick={() => add(it, i)}
-                          className="text-slate-400 hover:text-slate-900">
-                          <Plus className="size-4" />
+                      <div className="flex items-center justify-end gap-1.5">
+                        {it.productId && (
+                          <button type="button" aria-label="Přidat do příjemky"
+                            onClick={() => add(it, i)}
+                            className="text-slate-400 hover:text-slate-900">
+                            <Plus className="size-4" />
+                          </button>
+                        )}
+                        <button type="button" aria-label="Nepřidávat do příjemky" title="Odebrat z načtených"
+                          onClick={() => setRemovedIdx((p) => new Set(p).add(i))}
+                          className="text-slate-300 hover:text-red-600">
+                          <Trash2 className="size-4" />
                         </button>
-                      )}
+                      </div>
                     </TableCell>
                   </TableRow>
                   );
@@ -419,12 +429,21 @@ export function DeliveryScan({
               </TableBody>
             </Table>
           </div>
-          {matchedCount > 0 && (
-            <Button type="button" variant="outline" size="sm"
-              onClick={() => pendingMatched.forEach(({ it, i }) => add(it, i))}>
-              <Plus className="size-4" /> Přidat vše napárované ({matchedCount})
-            </Button>
-          )}
+          <div className="flex flex-wrap items-center gap-3">
+            {matchedCount > 0 && (
+              <Button type="button" variant="outline" size="sm"
+                onClick={() => pendingMatched.forEach(({ it, i }) => add(it, i))}>
+                <Plus className="size-4" /> Přidat vše napárované ({matchedCount})
+              </Button>
+            )}
+            {removedIdx.size > 0 && (
+              <button type="button"
+                onClick={() => setRemovedIdx(new Set())}
+                className="text-xs text-slate-400 underline-offset-2 hover:text-slate-700 hover:underline">
+                Odebráno {removedIdx.size} — vrátit zpět
+              </button>
+            )}
+          </div>
           <p className="text-xs text-slate-400">
             Ceny jsou přepočteny na cenu za kus bez DPH. Množství a balení zkontroluj
             před uložením — ceny ber jako návrh ke kontrole.
