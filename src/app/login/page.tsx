@@ -16,7 +16,7 @@ export default async function LoginPage() {
     <AuthShell
       footer={
         setupOpen ? (
-          <Link href="/registrace" className="font-medium text-[#103D63] hover:underline">
+          <Link href="/registrace" className="font-medium text-[#F4B63E] underline-offset-2 hover:underline">
             Začínáš? Vytvoř účet majitele kliniky →
           </Link>
         ) : null

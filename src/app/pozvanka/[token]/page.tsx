@@ -18,7 +18,7 @@ export default async function InvitePage({
   return (
     <AuthShell
       footer={
-        <Link href="/login" className="font-medium text-[#103D63] hover:underline">
+        <Link href="/login" className="font-medium text-[#F4B63E] underline-offset-2 hover:underline">
           Zpět na přihlášení
         </Link>
       }

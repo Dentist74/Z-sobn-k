@@ -12,7 +12,10 @@ export default async function ModeSelectPage() {
   if (user.role === "STAFF") redirect("/m");
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center bg-[#103D63] p-6">
+    <div
+      className="flex min-h-svh flex-col items-center justify-center p-6"
+      style={{ background: "linear-gradient(135deg,#152A45 0%,#0F1E32 100%)" }}
+    >
       <Image src="/brand-logo.png" alt="Svět úsměvů" width={210} height={64} className="mb-2 h-14 w-auto" />
       <h1 className="text-xl font-semibold text-white">Zásobník</h1>
       <p className="mb-8 mt-1 text-sm text-white/70">Ahoj {user.name.split(" ")[0]}, jak chceš pracovat?</p>

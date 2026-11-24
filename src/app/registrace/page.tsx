@@ -16,7 +16,7 @@ export default async function RegisterPage() {
   return (
     <AuthShell
       footer={
-        <Link href="/login" className="font-medium text-[#103D63] hover:underline">
+        <Link href="/login" className="font-medium text-[#F4B63E] underline-offset-2 hover:underline">
           Už máš účet? Přihlásit se →
         </Link>
       }
