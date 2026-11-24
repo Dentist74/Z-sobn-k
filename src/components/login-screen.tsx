@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Delete } from "lucide-react";
+import { Delete, ChevronDown, UserRound } from "lucide-react";
 import { login, type LoginState, listPinUsers, loginWithPin, type PinUser } from "@/app/actions/auth";
 import { ROLE_LABELS, type Role } from "@/lib/enums";
 
@@ -108,6 +108,7 @@ function PinPanel({ users }: { users: PinUser[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [selected, setSelected] = useState<PinUser | null>(null);
+  const [listOpen, setListOpen] = useState(false);
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -133,32 +134,55 @@ function PinPanel({ users }: { users: PinUser[] }) {
   }
 
   if (!selected) {
+    // Výběr uživatele jako rozbalovací nabídka — karta zůstane kompaktní
+    // i při větším počtu sestřiček (seznam uvnitř scrolluje).
     return (
       <div>
         <p className="mb-3 text-center text-sm text-[#9aa5b5]">Vyber se a zadej PIN</p>
-        <div className="flex flex-col gap-2">
-          {users.map((u) => (
-            <button
-              key={u.id}
-              type="button"
-              onClick={() => { setSelected(u); setPin(""); setError(null); }}
-              className="group flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-left transition hover:border-[#F4B63E]/50 hover:bg-white/10"
-            >
-              <span
-                style={{ background: GOLD_GRAD }}
-                className="flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-[#102239]"
-              >
-                {initials(u.name)}
-              </span>
-              <span>
-                <span className="block text-sm font-semibold text-slate-100">{u.name}</span>
-                <span className="block text-xs text-[#9aa5b5]">
-                  {ROLE_LABELS[u.role as Role] ?? u.role}
-                </span>
-              </span>
-              <span className="ml-auto text-[#9aa5b5] opacity-0 transition group-hover:opacity-100">→</span>
-            </button>
-          ))}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setListOpen((o) => !o)}
+            aria-expanded={listOpen}
+            className={
+              "flex w-full items-center gap-3 rounded-xl border bg-white/5 px-3.5 py-2.5 text-left transition " +
+              (listOpen ? "border-[#F4B63E]/60 bg-white/10" : "border-white/15 hover:border-[#F4B63E]/50 hover:bg-white/10")
+            }
+          >
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-[#9aa5b5]">
+              <UserRound className="size-5" />
+            </span>
+            <span className="text-sm font-semibold text-slate-200">Vyber uživatele…</span>
+            <ChevronDown
+              className={"ml-auto size-4 text-[#9aa5b5] transition-transform " + (listOpen ? "rotate-180" : "")}
+            />
+          </button>
+
+          {listOpen && (
+            <div className="absolute left-0 right-0 z-20 mt-2 max-h-64 overflow-y-auto rounded-xl border border-white/10 bg-[#15213A]/95 p-1.5 shadow-[0_20px_50px_-20px_rgba(0,0,0,.8)] backdrop-blur-xl">
+              {users.map((u) => (
+                <button
+                  key={u.id}
+                  type="button"
+                  onClick={() => { setSelected(u); setListOpen(false); setPin(""); setError(null); }}
+                  className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition hover:bg-white/10"
+                >
+                  <span
+                    style={{ background: GOLD_GRAD }}
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-[#102239]"
+                  >
+                    {initials(u.name)}
+                  </span>
+                  <span>
+                    <span className="block text-sm font-semibold text-slate-100">{u.name}</span>
+                    <span className="block text-xs text-[#9aa5b5]">
+                      {ROLE_LABELS[u.role as Role] ?? u.role}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
